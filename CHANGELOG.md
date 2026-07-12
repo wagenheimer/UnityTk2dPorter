@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2026-07-12
+
+### Fixed
+- only use Multiple sprite import mode for shared atlas regions, Single otherwise
+
 ## [0.4.0] - 2026-07-12
 
 ### Added
