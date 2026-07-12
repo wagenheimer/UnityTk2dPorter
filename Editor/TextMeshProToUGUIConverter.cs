@@ -162,7 +162,7 @@ public class TextMeshProToUGUIConverter : Editor
         }
     }
 
-    [MenuItem("Tools/Seven Sails/Convert TMP \u2192 TMP_UGUI (Selection)", false, 100)]
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Convert TMP \u2192 TMP_UGUI (Selection)", false, 100)]
     private static void ConvertFromMenuItem()
     {
         var tmps = Selection.GetFiltered<TextMeshPro>(SelectionMode.Unfiltered);
@@ -198,7 +198,7 @@ public class TextMeshProToUGUIConverter : Editor
         }
     }
 
-    [MenuItem("Tools/Seven Sails/Convert TMP \u2192 TMP_UGUI (Selection)", true)]
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Convert TMP \u2192 TMP_UGUI (Selection)", true)]
     private static bool ValidateConvertFromMenuItem()
     {
         return Selection.GetFiltered<TextMeshPro>(SelectionMode.Unfiltered).Length > 0;

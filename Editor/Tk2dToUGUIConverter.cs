@@ -30,7 +30,7 @@ public static class Tk2dImageConverter
         "tk2dUIManager",
     };
 
-    [MenuItem("Tools/Seven Sails/Convert tk2d → uGUI/Force UI Image (Selection)", false, 110)]
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Convert tk2d → uGUI/Force UI Image (Selection)", false, 110)]
     private static void ConvertFromMenuItem()
     {
         var selected = Selection.gameObjects;
@@ -88,7 +88,7 @@ public static class Tk2dImageConverter
         }
     }
 
-    [MenuItem("Tools/Seven Sails/Convert tk2d → uGUI/Force UI Image (Selection)", true)]
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Convert tk2d → uGUI/Force UI Image (Selection)", true)]
     private static bool ValidateConvertFromMenuItem()
     {
         var go = Selection.activeGameObject;

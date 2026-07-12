@@ -69,10 +69,10 @@ public static class Tk2dScriptFieldMigrator
             "Method parameter typed as a tk2d type (e.g. (tk2dUIItem obj)) — UIEventRelay.Invoke()/InvokeBool(bool) can only call 0-arg or 1-bool-arg methods; change the signature manually."),
     };
 
-    [MenuItem("Tools/Seven Sails/Migrate tk2d Script Fields → uGUI (Dry Run Report)", false, 200)]
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Migrate tk2d Script Fields → uGUI (Dry Run Report)", false, 200)]
     private static void DryRunReport() => RunScan(apply: false);
 
-    [MenuItem("Tools/Seven Sails/Migrate tk2d Script Fields → uGUI (Apply)", false, 201)]
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Migrate tk2d Script Fields → uGUI (Apply)", false, 201)]
     private static void ApplyMigration()
     {
         if (!EditorUtility.DisplayDialog(

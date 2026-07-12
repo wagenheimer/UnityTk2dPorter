@@ -13,7 +13,7 @@ using System.Collections.Generic;
 /// </summary>
 public static class Tk2dConversionRouter
 {
-    [MenuItem("Tools/Seven Sails/Convert tk2d → uGUI/Auto-detect (Selection)", false, 100)]
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Convert tk2d → uGUI/Auto-detect (Selection)", false, 100)]
     private static void ConvertAutoDetect()
     {
         var selected = Selection.gameObjects;
@@ -66,7 +66,7 @@ public static class Tk2dConversionRouter
             Selection.objects = allConverted.ToArray();
     }
 
-    [MenuItem("Tools/Seven Sails/Convert tk2d → uGUI/Auto-detect (Selection)", true)]
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Convert tk2d → uGUI/Auto-detect (Selection)", true)]
     private static bool ValidateConvertAutoDetect()
     {
         var go = Selection.activeGameObject;

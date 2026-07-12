@@ -79,9 +79,9 @@ Or add it manually to `Packages/manifest.json`:
 Select one or more GameObjects containing tk2d sprites, then use one of:
 
 ```
-Tools/Seven Sails/Convert tk2d → uGUI/Auto-detect (Selection)
-Tools/Seven Sails/Convert tk2d → uGUI/Force UI Image (Selection)
-Tools/Seven Sails/Convert tk2d → uGUI/Force Sprite Renderer (Selection)
+Tools/Wagenheimer/Tk2d Porter/Convert tk2d → uGUI/Auto-detect (Selection)
+Tools/Wagenheimer/Tk2d Porter/Convert tk2d → uGUI/Force UI Image (Selection)
+Tools/Wagenheimer/Tk2d Porter/Convert tk2d → uGUI/Force Sprite Renderer (Selection)
 ```
 
 Right-click a `tk2dSprite`/`tk2dSlicedSprite`/`tk2dClippedSprite`/`tk2dTiledSprite` component in the
@@ -94,8 +94,8 @@ and assigns it automatically.
 ### 2. Migrate referencing script fields
 
 ```
-Tools/Seven Sails/Migrate tk2d Script Fields → uGUI (Dry Run Report)
-Tools/Seven Sails/Migrate tk2d Script Fields → uGUI (Apply)
+Tools/Wagenheimer/Tk2d Porter/Migrate tk2d Script Fields → uGUI (Dry Run Report)
+Tools/Wagenheimer/Tk2d Porter/Migrate tk2d Script Fields → uGUI (Apply)
 ```
 
 Run the Dry Run first, review the generated Markdown report (field rewrites + manual-review items),

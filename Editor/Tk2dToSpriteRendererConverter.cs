@@ -11,7 +11,7 @@ using System.Collections.Generic;
 /// </summary>
 public static class Tk2dSpriteRendererConverter
 {
-    [MenuItem("Tools/Seven Sails/Convert tk2d → uGUI/Force Sprite Renderer (Selection)", false, 111)]
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Convert tk2d → uGUI/Force Sprite Renderer (Selection)", false, 111)]
     private static void ConvertFromMenuItem()
     {
         var selected = Selection.gameObjects;
@@ -43,7 +43,7 @@ public static class Tk2dSpriteRendererConverter
         }
     }
 
-    [MenuItem("Tools/Seven Sails/Convert tk2d → uGUI/Force Sprite Renderer (Selection)", true)]
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Convert tk2d → uGUI/Force Sprite Renderer (Selection)", true)]
     private static bool ValidateConvertFromMenuItem()
     {
         var go = Selection.activeGameObject;
