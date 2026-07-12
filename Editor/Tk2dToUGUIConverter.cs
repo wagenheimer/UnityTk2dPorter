@@ -788,11 +788,16 @@ public static class Tk2dImageConverter
     /// handleRect, fill (highlightProgressBar) as fillRect, plus the
     /// SendMessage-compatible onValueChanged relay. Also strips the
     /// now-useless tk2dUIItem components tk2d left on the background/handle
-    /// children (drag/click detection is now handled natively by the Slider)
-    /// and flattens purely organizational anchor wrappers tk2d used to
-    /// compute drag bounds (e.g. "BarStartPosition") that UGUI's Slider does
-    /// not need — it derives handle travel from handleRect + its own
-    /// RectTransform.
+    /// children (drag/click detection is now handled natively by the Slider).
+    ///
+    /// Deliberately does NOT reparent or destroy any GameObject — the
+    /// original hierarchy (including purely organizational wrappers like
+    /// "BarStartPosition") is left exactly as-is; only components are
+    /// added/removed. An earlier version flattened/deleted wrapper
+    /// GameObjects here, which combined badly with nested prefab unpacking
+    /// happening elsewhere in the same batch (reparented unrelated siblings
+    /// and zeroed out Transform scale on the root) — not worth the risk for
+    /// a purely cosmetic hierarchy cleanup.
     /// </summary>
     private static void ConfigureScrollbar(GameObject go, tk2dUIScrollbar scrollbar)
     {
@@ -803,29 +808,19 @@ public static class Tk2dImageConverter
             : (scrollbar.thumbTransform != null ? scrollbar.thumbTransform.gameObject : null);
         GameObject progressGO = scrollbar.highlightProgressBar != null ? scrollbar.highlightProgressBar.gameObject : null;
 
-        Image backgroundImage = barGO != null ? barGO.GetComponent<Image>() : go.GetComponent<Image>();
-        Image handleImage = thumbGO != null ? thumbGO.GetComponentInChildren<Image>(true) : null;
-        Image fillImage = progressGO != null ? progressGO.GetComponent<Image>() : null;
+        // The background/handle/fill children are normally converted to
+        // Image by the sprite pass that runs before this one — but convert
+        // them defensively here too, so wiring still works correctly
+        // regardless of pass ordering (e.g. when this method is invoked
+        // directly on a scrollbar whose own root already had a sprite).
+        Image backgroundImage = ResolveOrConvertImage(barGO) ?? go.GetComponent<Image>();
+        Image handleImage = ResolveOrConvertImage(thumbGO);
+        Image fillImage = ResolveOrConvertImage(progressGO);
 
         GameObject sendTarget = scrollbar.SendMessageTarget;
         string sendMethod = scrollbar.SendMessageOnScrollMethodName;
         float value = Mathf.Clamp01(scrollbar.Value);
         var axis = scrollbar.scrollAxes;
-
-        // "BarStartPosition"-style anchor wrappers only existed to let tk2d
-        // compute the handle's drag bounds — UGUI's Slider derives that from
-        // handleRect + its own RectTransform, so the wrapper is dead weight.
-        // Flatten the handle out to a direct child before stripping tk2d
-        // components, then remove the now-empty wrapper (if it isn't the
-        // background/track itself).
-        if (thumbGO != null && thumbGO.transform.parent != null && thumbGO.transform.parent.gameObject != go
-            && thumbGO.transform.parent.gameObject != barGO)
-        {
-            var oldParent = thumbGO.transform.parent.gameObject;
-            Undo.SetTransformParent(thumbGO.transform, go.transform, "Reparent slider handle");
-            if (oldParent.transform.childCount == 0)
-                Undo.DestroyObjectImmediate(oldParent);
-        }
 
         var slider = go.GetComponent<Slider>();
         if (slider == null) slider = Undo.AddComponent<Slider>(go);
@@ -857,7 +852,8 @@ public static class Tk2dImageConverter
         slider.SetValueWithoutNotify(value);
 
         // tk2d's own click/drag detection (tk2dUIItem on the track/handle)
-        // is now redundant — UGUI's Slider drives everything itself.
+        // is now redundant — UGUI's Slider drives everything itself. Only
+        // removes components, never touches the hierarchy.
         StripTk2dUIComponents(barGO);
         StripTk2dUIComponents(thumbGO);
         StripTk2dUIComponents(progressGO);
@@ -874,6 +870,27 @@ public static class Tk2dImageConverter
         }
 
         Debug.Log($"[Tk2dConverter]   '{go.name}': Slider configured (background={backgroundImage != null}, handle={handleImage != null}, fill={fillImage != null}).", go);
+    }
+
+    /// <summary>
+    /// Returns the Image already on <paramref name="go"/> (or its children,
+    /// for a handle wrapper whose visible sprite is one level down), or
+    /// converts it right now if it still carries a raw tk2d sprite component
+    /// — makes scrollbar wiring resilient to pass ordering instead of
+    /// assuming the sprite pass already ran.
+    /// </summary>
+    private static Image ResolveOrConvertImage(GameObject go)
+    {
+        if (go == null) return null;
+
+        var existing = go.GetComponent<Image>();
+        if (existing != null) return existing;
+
+        var spr = go.GetComponent<tk2dBaseSprite>();
+        if (spr != null && Convert(spr))
+            return go.GetComponent<Image>();
+
+        return go.GetComponentInChildren<Image>(true);
     }
 
     /// <summary>

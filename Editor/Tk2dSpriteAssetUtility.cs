@@ -17,6 +17,30 @@ internal static class Tk2dSpriteAssetUtility
         TextureImporter importer = AssetImporter.GetAtPath(texPath) as TextureImporter;
         if (importer == null) return null;
 
+        bool isAtlasRegion = def.extractRegion && def.regionW > 0 && def.regionH > 0;
+
+        // Already a properly configured sprite for this definition — return
+        // it as-is without touching any import setting. Reprocessing an
+        // already-correct texture (forcing pixelsPerUnit/border/alignment
+        // again on every conversion run) risks corrupting textures that are
+        // legitimately shared/reused outside this specific tk2d definition,
+        // or unrelated textures matched by filename via ResolveTexturePath's
+        // fallback search — this was silently "fixing" sprites that never
+        // needed to be touched at all.
+        if (importer.textureType == TextureImporterType.Sprite)
+        {
+            if (!isAtlasRegion && importer.spriteImportMode == SpriteImportMode.Single)
+            {
+                var existingSingle = AssetDatabase.LoadAssetAtPath<Sprite>(texPath);
+                if (existingSingle != null) return existingSingle;
+            }
+            else if (isAtlasRegion && importer.spriteImportMode == SpriteImportMode.Multiple)
+            {
+                var existingMultiple = LoadSpriteAtPath(texPath, def);
+                if (existingMultiple != null && existingMultiple.name == def.name) return existingMultiple;
+            }
+        }
+
         bool needsReimport = false;
 
         if (importer.textureType != TextureImporterType.Sprite)
@@ -41,8 +65,6 @@ internal static class Tk2dSpriteAssetUtility
         // covering the whole image should stay "Single" — that's what a
         // plain, non-atlas source image normally uses, and avoids the
         // confusing "Multiple sprite mode with a single entry" result.
-        bool isAtlasRegion = def.extractRegion && def.regionW > 0 && def.regionH > 0;
-
         return isAtlasRegion
             ? ConfigureMultipleSprite(importer, def, texPath, border, isSliced, needsReimport)
             : ConfigureSingleSprite(importer, texPath, border, needsReimport);
