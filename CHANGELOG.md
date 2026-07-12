@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-07-12
+
+### Added
+- convert tk2dUIScrollbar roots without their own sprite (background/handle/fill wiring, SendMessage relay, dead wrapper cleanup)
+
 ## [0.3.0] - 2026-07-12
 
 ### Added
