@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.2] - 2026-07-12
+
+### Fixed
+- use TextureImporterSettings for spriteAlignment (not exposed directly on TextureImporter)
+
 ## [0.4.1] - 2026-07-12
 
 ### Fixed
