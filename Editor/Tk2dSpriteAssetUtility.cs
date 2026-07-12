@@ -62,9 +62,14 @@ internal static class Tk2dSpriteAssetUtility
             needsReimport = true;
         }
 
-        if (importer.spriteAlignment != (int)SpriteAlignment.Center)
+        // spriteAlignment/spritePivot aren't exposed directly on
+        // TextureImporter — they live in TextureImporterSettings.
+        var settings = new TextureImporterSettings();
+        importer.ReadTextureSettings(settings);
+        if (settings.spriteAlignment != (int)SpriteAlignment.Center)
         {
-            importer.spriteAlignment = (int)SpriteAlignment.Center;
+            settings.spriteAlignment = (int)SpriteAlignment.Center;
+            importer.SetTextureSettings(settings);
             needsReimport = true;
         }
 
