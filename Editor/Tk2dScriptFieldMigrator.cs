@@ -66,7 +66,7 @@ public static class Tk2dScriptFieldMigrator
         (new Regex(@"GetComponent(?:InChildren|InParent)?<(tk2dUI\w+|tk2dSprite|tk2dSlicedSprite|tk2dClippedSprite|tk2dTiledSprite|tk2dBaseSprite|tk2dSpriteAnimator)>\s*\("),
             "GetComponent<tk2dXxx>() call site — update the generic argument to the uGUI/native equivalent (tk2dSpriteAnimator has no 1:1 mapping)."),
         (new Regex(@"\(\s*tk2dUI\w+\s+\w+\s*\)"),
-            "Method parameter typed as a tk2d type (e.g. (tk2dUIItem obj)) — UIEventRelay.Invoke()/InvokeBool(bool) can only call 0-arg or 1-bool-arg methods; change the signature manually."),
+            "Method parameter typed as a tk2d type (e.g. (tk2dUIItem obj)) — UIEventRelay.Invoke()/InvokeBool(bool)/InvokeFloat(float) can only call 0-arg, 1-bool-arg, or 1-float-arg methods; change the signature manually."),
     };
 
     [MenuItem("Tools/Wagenheimer/Tk2d Porter/Migrate tk2d Script Fields → uGUI (Dry Run Report)", false, 200)]

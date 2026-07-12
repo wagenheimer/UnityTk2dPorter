@@ -22,4 +22,10 @@ public class UIEventRelay : MonoBehaviour
         if (Target == null || string.IsNullOrEmpty(MethodName)) return;
         Target.SendMessage(MethodName, value, SendMessageOptions.DontRequireReceiver);
     }
+
+    public void InvokeFloat(float value)
+    {
+        if (Target == null || string.IsNullOrEmpty(MethodName)) return;
+        Target.SendMessage(MethodName, value, SendMessageOptions.DontRequireReceiver);
+    }
 }

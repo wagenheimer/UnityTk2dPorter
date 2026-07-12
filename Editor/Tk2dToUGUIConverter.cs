@@ -223,7 +223,16 @@ public static class Tk2dImageConverter
             }
         }
 
-        // Second pass: tk2d buttons whose visual doesn't live on the
+        // Second pass: tk2d scrollbars, whose root GameObject typically has
+        // no sprite of its own either — the background/handle/fill sprites
+        // live on separate children (barUIItem/thumbBtn/highlightProgressBar).
+        // Runs BEFORE the button pass so the scrollbar's own tk2dUIItem-based
+        // children (background track, drag handle) get their tk2dUIItem
+        // stripped here instead of being (harmlessly but noisily) mistaken
+        // for stray buttons by the pass below.
+        ConvertScrollbarRootsRecursive(root, converted, log, ref count);
+
+        // Third pass: tk2d buttons whose visual doesn't live on the
         // GameObject itself, but on state children (Off/On/Disabled via
         // tk2dUIHoverDisabledItem). Those GameObjects have no
         // tk2dBaseSprite of their own, so the loop above never touches
@@ -231,9 +240,52 @@ public static class Tk2dImageConverter
         // orphaned.
         ConvertButtonRootsRecursive(root, converted, log, ref count);
 
-        // Third pass: tk2d toggles (same Off/On state-children pattern, but
+        // Fourth pass: tk2d toggles (same Off/On state-children pattern, but
         // via tk2dUIToggleButton/tk2dUIToggleControl).
         ConvertToggleRootsRecursive(root, converted, log, ref count);
+    }
+
+    private static void ConvertScrollbarRootsRecursive(GameObject root, List<GameObject> converted, StringBuilder log, ref int count)
+    {
+        var scrollbars = root.GetComponentsInChildren<tk2dUIScrollbar>(true);
+        Debug.Log($"[Tk2dConverter] '{root.name}': {scrollbars.Length} tk2dUIScrollbar found in the hierarchy.");
+
+        foreach (var sb in scrollbars)
+        {
+            if (sb == null) continue;
+            var go = sb.gameObject;
+
+            if (go.GetComponent<Slider>() != null) continue; // already converted
+            if (go.GetComponent<tk2dBaseSprite>() != null) continue; // handled by the sprite loop's ConvertLegacyComponents call
+
+            Debug.Log($"[Tk2dConverter] Converting scrollbar (no sprite of its own) '{go.name}'...");
+
+            try
+            {
+                if (PrefabUtility.IsPartOfPrefabInstance(go))
+                {
+                    PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.UserAction);
+                }
+
+                EnsureRectTransform(go);
+                Undo.RegisterCompleteObjectUndo(go, "Convert tk2d Scrollbar Root");
+
+                ConfigureScrollbar(go, sb);
+                RemoveLegacyTk2dUIComponents(go);
+                Tk2dSpriteAssetUtility.RemoveLegacyComponents(go);
+
+                EditorUtility.SetDirty(go);
+
+                converted.Add(go);
+                log.AppendLine($"  • {go.name} (Scrollbar Root)");
+                count++;
+                Debug.Log($"[Tk2dConverter] ✓ '{go.name}' (scrollbar) converted successfully.");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[Tk2dConverter] ✗ Exception converting scrollbar '{go.name}': {ex}", go);
+            }
+        }
     }
 
     private static void ConvertButtonRootsRecursive(GameObject root, List<GameObject> converted, StringBuilder log, ref int count)
@@ -727,32 +779,125 @@ public static class Tk2dImageConverter
         if (scrollbar == null) return;
         if (go.GetComponent<Slider>() != null) return;
 
-        var slider = Undo.AddComponent<Slider>(go);
+        ConfigureScrollbar(go, scrollbar);
+    }
 
-        slider.direction = scrollbar.scrollAxes == tk2dUIScrollbar.Axes.XAxis
-            ? Slider.Direction.LeftToRight
-            : Slider.Direction.BottomToTop;
+    /// <summary>
+    /// Builds a fully-wired uGUI Slider from a tk2dUIScrollbar: background
+    /// (barUIItem) as targetGraphic, handle (thumbBtn/thumbTransform) as
+    /// handleRect, fill (highlightProgressBar) as fillRect, plus the
+    /// SendMessage-compatible onValueChanged relay. Also strips the
+    /// now-useless tk2dUIItem components tk2d left on the background/handle
+    /// children (drag/click detection is now handled natively by the Slider)
+    /// and flattens purely organizational anchor wrappers tk2d used to
+    /// compute drag bounds (e.g. "BarStartPosition") that UGUI's Slider does
+    /// not need — it derives handle travel from handleRect + its own
+    /// RectTransform.
+    /// </summary>
+    private static void ConfigureScrollbar(GameObject go, tk2dUIScrollbar scrollbar)
+    {
+        Debug.Log($"[Tk2dConverter]   '{go.name}': configuring Slider...");
 
+        GameObject barGO = scrollbar.barUIItem != null ? scrollbar.barUIItem.gameObject : null;
+        GameObject thumbGO = scrollbar.thumbBtn != null ? scrollbar.thumbBtn.gameObject
+            : (scrollbar.thumbTransform != null ? scrollbar.thumbTransform.gameObject : null);
+        GameObject progressGO = scrollbar.highlightProgressBar != null ? scrollbar.highlightProgressBar.gameObject : null;
+
+        Image backgroundImage = barGO != null ? barGO.GetComponent<Image>() : go.GetComponent<Image>();
+        Image handleImage = thumbGO != null ? thumbGO.GetComponentInChildren<Image>(true) : null;
+        Image fillImage = progressGO != null ? progressGO.GetComponent<Image>() : null;
+
+        GameObject sendTarget = scrollbar.SendMessageTarget;
+        string sendMethod = scrollbar.SendMessageOnScrollMethodName;
+        float value = Mathf.Clamp01(scrollbar.Value);
+        var axis = scrollbar.scrollAxes;
+
+        // "BarStartPosition"-style anchor wrappers only existed to let tk2d
+        // compute the handle's drag bounds — UGUI's Slider derives that from
+        // handleRect + its own RectTransform, so the wrapper is dead weight.
+        // Flatten the handle out to a direct child before stripping tk2d
+        // components, then remove the now-empty wrapper (if it isn't the
+        // background/track itself).
+        if (thumbGO != null && thumbGO.transform.parent != null && thumbGO.transform.parent.gameObject != go
+            && thumbGO.transform.parent.gameObject != barGO)
+        {
+            var oldParent = thumbGO.transform.parent.gameObject;
+            Undo.SetTransformParent(thumbGO.transform, go.transform, "Reparent slider handle");
+            if (oldParent.transform.childCount == 0)
+                Undo.DestroyObjectImmediate(oldParent);
+        }
+
+        var slider = go.GetComponent<Slider>();
+        if (slider == null) slider = Undo.AddComponent<Slider>(go);
+
+        slider.direction = axis == tk2dUIScrollbar.Axes.XAxis ? Slider.Direction.LeftToRight : Slider.Direction.BottomToTop;
         slider.minValue = 0;
         slider.maxValue = 1;
-        slider.value = Mathf.Clamp01(scrollbar.Value);
         slider.wholeNumbers = false;
         slider.interactable = true;
 
-        var image = go.GetComponent<Image>();
-        if (image != null)
+        if (backgroundImage != null)
         {
-            image.raycastTarget = true;
+            backgroundImage.raycastTarget = true;
+            slider.targetGraphic = backgroundImage;
         }
 
-        if (scrollbar.thumbTransform != null && scrollbar.thumbTransform != go.transform)
+        if (handleImage != null)
         {
-            var handleImage = scrollbar.thumbTransform.GetComponent<Image>();
-            if (handleImage != null)
-                slider.handleRect = scrollbar.thumbTransform as RectTransform;
+            handleImage.raycastTarget = true;
+            slider.handleRect = handleImage.GetComponent<RectTransform>();
         }
 
-        Debug.Log($"[Scrollbar] Converted '{go.name}' to Slider", go);
+        if (fillImage != null)
+        {
+            fillImage.raycastTarget = false;
+            slider.fillRect = fillImage.GetComponent<RectTransform>();
+        }
+
+        slider.SetValueWithoutNotify(value);
+
+        // tk2d's own click/drag detection (tk2dUIItem on the track/handle)
+        // is now redundant — UGUI's Slider drives everything itself.
+        StripTk2dUIComponents(barGO);
+        StripTk2dUIComponents(thumbGO);
+        StripTk2dUIComponents(progressGO);
+
+        if (sendTarget != null && !string.IsNullOrEmpty(sendMethod))
+        {
+            var relay = go.GetComponent<UIEventRelay>();
+            if (relay == null) relay = Undo.AddComponent<UIEventRelay>(go);
+            relay.Target = sendTarget;
+            relay.MethodName = sendMethod;
+
+            UnityEventTools.AddPersistentListener(slider.onValueChanged, relay.InvokeFloat);
+            Debug.Log($"[Tk2dConverter]   '{go.name}': onValueChanged → SendMessage('{sendMethod}', float) on '{sendTarget.name}' (via relay)", go);
+        }
+
+        Debug.Log($"[Tk2dConverter]   '{go.name}': Slider configured (background={backgroundImage != null}, handle={handleImage != null}, fill={fillImage != null}).", go);
+    }
+
+    /// <summary>
+    /// Destroys every tk2dUI*-prefixed component on a specific GameObject
+    /// (not its children), respecting the same gameplay-logic exclusion list
+    /// as the general purge — used to clean up known child objects (a
+    /// scrollbar's background/handle/fill) whose own tk2dUIItem/tk2dUI*
+    /// controls are now redundant once the parent has a working uGUI Slider.
+    /// </summary>
+    private static void StripTk2dUIComponents(GameObject go)
+    {
+        if (go == null) return;
+
+        var components = go.GetComponents<Component>();
+        foreach (var comp in components)
+        {
+            if (comp == null) continue;
+
+            string typeName = comp.GetType().Name;
+            if (!typeName.StartsWith("tk2dUI")) continue;
+            if (Tk2dUITypeNamesToPreserve.Contains(typeName)) continue;
+
+            Undo.DestroyObjectImmediate(comp);
+        }
     }
 
     private static void RemoveLegacyTk2dUIComponents(GameObject go)
