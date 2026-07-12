@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-07-12
+
+### Fixed
+- add missing .meta files (Unity ignores immutable package folders without them)
+
 ## [0.2.0] - 2026-07-12
 
 ### Added
