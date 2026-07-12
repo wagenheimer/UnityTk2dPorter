@@ -35,19 +35,58 @@ internal static class Tk2dSpriteAssetUtility
         if (isSliced)
             border = CalculateSpriteBorder(def, borderBL, borderTR, texPath);
 
-        Rect spriteRect;
+        // A texture only needs "Multiple" sprite mode when it's an atlas
+        // shared by several tk2d definitions (a sub-region is being
+        // extracted from it). A texture dedicated to exactly one definition
+        // covering the whole image should stay "Single" — that's what a
+        // plain, non-atlas source image normally uses, and avoids the
+        // confusing "Multiple sprite mode with a single entry" result.
+        bool isAtlasRegion = def.extractRegion && def.regionW > 0 && def.regionH > 0;
 
-        if (def.extractRegion && def.regionW > 0 && def.regionH > 0)
+        return isAtlasRegion
+            ? ConfigureMultipleSprite(importer, def, texPath, border, isSliced, needsReimport)
+            : ConfigureSingleSprite(importer, texPath, border, needsReimport);
+    }
+
+    private static Sprite ConfigureSingleSprite(TextureImporter importer, string texPath, Vector4 border, bool needsReimport)
+    {
+        if (importer.spriteImportMode != SpriteImportMode.Single)
         {
-            spriteRect = new Rect(def.regionX, def.regionY, def.regionW, def.regionH);
-        }
-        else
-        {
-            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
-            spriteRect = new Rect(0, 0, tex != null ? tex.width : 100, tex != null ? tex.height : 100);
+            importer.spriteImportMode = SpriteImportMode.Single;
+            needsReimport = true;
         }
 
-        importer.spriteImportMode = SpriteImportMode.Multiple;
+        if (!Approximately(importer.spriteBorder, border))
+        {
+            importer.spriteBorder = border;
+            needsReimport = true;
+        }
+
+        if (importer.spriteAlignment != (int)SpriteAlignment.Center)
+        {
+            importer.spriteAlignment = (int)SpriteAlignment.Center;
+            needsReimport = true;
+        }
+
+        if (needsReimport)
+        {
+            importer.SaveAndReimport();
+            AssetDatabase.Refresh();
+        }
+
+        return AssetDatabase.LoadAssetAtPath<Sprite>(texPath);
+    }
+
+    private static Sprite ConfigureMultipleSprite(TextureImporter importer, tk2dSpriteDefinition def, string texPath, Vector4 border, bool isSliced, bool needsReimport)
+    {
+        Rect spriteRect = new Rect(def.regionX, def.regionY, def.regionW, def.regionH);
+
+        if (importer.spriteImportMode != SpriteImportMode.Multiple)
+        {
+            importer.spriteImportMode = SpriteImportMode.Multiple;
+            needsReimport = true;
+        }
+
         var sheet = new List<SpriteMetaData>(importer.spritesheet);
         bool found = false;
 
