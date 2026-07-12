@@ -394,9 +394,15 @@ public static class Tk2dImageConverter
 
     /// <summary>
     /// Converts the root of a tk2d toggle whose visual lives in state
-    /// children (Off/On) instead of a tk2dBaseSprite of its own. The "Off"
-    /// state becomes the background Image (Toggle.targetGraphic); the "On"
-    /// state is preserved as a child and becomes the checkmark (Toggle.graphic).
+    /// children (Off/On, plus an optional nested hover component for
+    /// Over/Out highlight sprites — the common "CheckBox/Graphics/
+    /// BackgroundOver,BackgroundOut,Check" tk2d checkbox pattern) instead of
+    /// a tk2dBaseSprite of its own. "Off"/"Out" becomes the background Image
+    /// (Toggle.targetGraphic); "Over" (if any) becomes the SpriteSwap
+    /// highlighted sprite; "On"/"Check" is pulled out as a direct child and
+    /// becomes the checkmark (Toggle.graphic). Every leftover wrapper
+    /// GameObject (CheckBox, Graphics, the old Off/Over state objects) is
+    /// destroyed — nothing but the Toggle root + checkmark child remains.
     /// </summary>
     internal static bool ConvertToggleRoot(GameObject go)
     {
@@ -408,14 +414,24 @@ public static class Tk2dImageConverter
         GameObject offGO = toggleComp.offStateGO;
         GameObject onGO = toggleComp.onStateGO;
 
-        Image sourceImage = offGO != null ? offGO.GetComponent<Image>() : null;
-        if (sourceImage == null)
-            sourceImage = onGO != null ? onGO.GetComponent<Image>() : null;
+        // Some tk2d checkboxes also drive a separate hover highlight
+        // (Over/Out), independent of the on/off state, via a nested
+        // tk2dUIHoverDisabledItem — reuse it for the Toggle's SpriteSwap
+        // "Highlighted" sprite.
+        var hoverItem = go.GetComponentInChildren<tk2dUIHoverDisabledItem>(true);
+        GameObject hoverOutGO = hoverItem != null ? hoverItem.outStateGO : null;
+        GameObject hoverOverGO = hoverItem != null ? hoverItem.overStateGO : null;
 
-        if (sourceImage == null)
+        Image backgroundSource = (hoverOutGO != null ? hoverOutGO.GetComponent<Image>() : null)
+            ?? (offGO != null ? offGO.GetComponent<Image>() : null)
+            ?? (onGO != null ? onGO.GetComponent<Image>() : null);
+
+        if (backgroundSource == null)
         {
             return false;
         }
+
+        Sprite highlightedSprite = hoverOverGO != null ? hoverOverGO.GetComponent<Image>()?.sprite : null;
 
         if (PrefabUtility.IsPartOfPrefabInstance(go))
         {
@@ -425,7 +441,7 @@ public static class Tk2dImageConverter
         EnsureRectTransform(go);
         Undo.RegisterCompleteObjectUndo(go, "Convert tk2d Toggle Root");
 
-        var sourceRect = sourceImage.GetComponent<RectTransform>();
+        var sourceRect = backgroundSource.GetComponent<RectTransform>();
         Vector2 size = sourceRect != null ? sourceRect.sizeDelta : Vector2.zero;
 
         var boxCollider = go.GetComponent<BoxCollider>();
@@ -435,26 +451,76 @@ public static class Tk2dImageConverter
         }
 
         var image = Undo.AddComponent<Image>(go);
-        image.sprite = sourceImage.sprite;
-        image.color = sourceImage.color;
-        image.type = sourceImage.type;
-        image.fillCenter = sourceImage.fillCenter;
+        image.sprite = backgroundSource.sprite;
+        image.color = backgroundSource.color;
+        image.type = backgroundSource.type;
+        image.fillCenter = backgroundSource.fillCenter;
         image.raycastTarget = true;
 
         var rt = go.GetComponent<RectTransform>();
         if (size != Vector2.zero)
             rt.sizeDelta = size;
 
-        // "Off" was already merged into the background Image — no longer
-        // needed. "On" is preserved as a child: it becomes the checkmark
-        // (Toggle.graphic).
-        if (offGO != null && offGO != go && offGO != onGO)
-            Undo.DestroyObjectImmediate(offGO);
+        // Pull the checkmark ("On") out of whatever wrapper hierarchy it was
+        // nested in (CheckBox/Graphics/...) so it survives as a direct
+        // child, then wipe every other leftover state/wrapper GameObject —
+        // but never anything outside that subtree (e.g. a sibling text
+        // label like "labelFullScreen" is left untouched).
+        if (onGO != null && onGO.transform.parent != go.transform)
+            Undo.SetTransformParent(onGO.transform, go.transform, "Reparent checkmark");
+
+        DestroyStateWrapperAncestor(go, offGO, onGO);
+        DestroyStateWrapperAncestor(go, hoverOutGO, onGO);
+        DestroyStateWrapperAncestor(go, hoverOverGO, onGO);
 
         ConvertLegacyComponents(go);
+        ApplyToggleSpriteSwap(go, highlightedSprite);
 
         EditorUtility.SetDirty(go);
         return true;
+    }
+
+    /// <summary>
+    /// Destroys the direct child of <paramref name="root"/> that is (or
+    /// contains) <paramref name="descendant"/>, unless that's the same
+    /// object as <paramref name="keep"/> or an ancestor of it — used to wipe
+    /// an entire now-useless wrapper hierarchy (e.g. "CheckBox/Graphics") in
+    /// one shot instead of destroying only the specific leaf that supplied a
+    /// sprite.
+    /// </summary>
+    private static void DestroyStateWrapperAncestor(GameObject root, GameObject descendant, GameObject keep)
+    {
+        if (descendant == null || descendant == root) return;
+
+        var t = descendant.transform;
+        while (t != null && t.parent != root.transform)
+            t = t.parent;
+
+        if (t == null || t == root.transform) return;
+
+        var topLevelChild = t.gameObject;
+        if (topLevelChild == keep) return;
+        if (keep != null && keep.transform.IsChildOf(t)) return;
+
+        if (topLevelChild != null)
+            Undo.DestroyObjectImmediate(topLevelChild);
+    }
+
+    /// <summary>
+    /// Sets up SpriteSwap as the Toggle's interaction-feedback transition
+    /// (hover highlight), independent of the on/off checkmark graphic.
+    /// </summary>
+    private static void ApplyToggleSpriteSwap(GameObject go, Sprite highlightedSprite)
+    {
+        if (highlightedSprite == null) return;
+
+        var toggle = go.GetComponent<Toggle>();
+        if (toggle == null) return;
+
+        toggle.transition = Selectable.Transition.SpriteSwap;
+        var spriteState = toggle.spriteState;
+        spriteState.highlightedSprite = highlightedSprite;
+        toggle.spriteState = spriteState;
     }
 
     internal static bool Convert(tk2dBaseSprite spr)
@@ -714,6 +780,14 @@ public static class Tk2dImageConverter
         GameObject toggleSendTarget = isToggle ? toggleComp.SendMessageTarget : null;
         string toggleSendMethod = isToggle ? toggleComp.SendMessageOnToggleMethodName : null;
 
+        Sprite toggleHighlightedSprite = null;
+        if (isToggle)
+        {
+            var hoverItem = go.GetComponentInChildren<tk2dUIHoverDisabledItem>(true);
+            var hoverOverGO = hoverItem != null ? hoverItem.overStateGO : null;
+            toggleHighlightedSprite = hoverOverGO != null ? hoverOverGO.GetComponent<Image>()?.sprite : null;
+        }
+
         var components = go.GetComponents<Component>();
         var componentsToRemove = new List<Component>();
 
@@ -753,6 +827,7 @@ public static class Tk2dImageConverter
         if (isToggle)
         {
             ConfigureToggle(go, toggleOnStateGO, toggleIsOn, toggleSendTarget, toggleSendMethod);
+            ApplyToggleSpriteSwap(go, toggleHighlightedSprite);
         }
         else if (isButton)
         {
