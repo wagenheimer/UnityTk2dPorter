@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2026-07-12
+
+### Fixed
+- remove leftover MeshRenderer/MeshFilter after TextMeshPro to TextMeshProUGUI conversion
+
 ## [0.2.2] - 2026-07-12
 
 ### Fixed
