@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.3] - 2026-07-12
+
+### Fixed
+- stop touching already-correct sprites; stop reparenting/destroying GameObjects during scrollbar conversion (was corrupting hierarchy and zeroing Transform scale via nested prefab unpack interaction)
+
 ## [0.4.2] - 2026-07-12
 
 ### Fixed
