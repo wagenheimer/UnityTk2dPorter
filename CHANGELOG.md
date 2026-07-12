@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2026-07-12
+
+### Fixed
+- consolidate all menu items under Tools/Wagenheimer/Tk2d Porter
+
 ## [0.2.1] - 2026-07-12
 
 ### Fixed
