@@ -1,6 +1,6 @@
 {
   "name": "com.wagenheimer.tk2dporter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "displayName": "Tk2d Porter",
   "description": "Editor tools to migrate 2D Toolkit (tk2d) content to native Unity: sprites to Image (uGUI) or SpriteRenderer with automatic UI/world-space detection, tk2d buttons/toggles/scrollbars to Button/Toggle/Slider (with a SendMessage-compatible click/toggle relay), TextMeshPro (3D) to TextMeshProUGUI, plus a script-field migrator that mechanically updates referencing C# fields.",
   "unity": "2021.3",

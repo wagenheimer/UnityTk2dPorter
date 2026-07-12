@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-07-12
+
+### Added
+- initial release of Tk2d Porter
+
 ## [0.1.0] - 2026-07-11
 
 ### Added
