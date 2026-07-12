@@ -638,6 +638,14 @@ public static class Tk2dImageConverter
             tmpUGUI.wordSpacing = wordSpacing;
             tmpUGUI.paragraphSpacing = paraSpacing;
 
+            // TextMeshProUGUI renders via CanvasRenderer, not a MeshRenderer —
+            // the 3D TextMeshPro's MeshRenderer/MeshFilter are dead weight now.
+            var meshRenderer = go.GetComponent<MeshRenderer>();
+            if (meshRenderer != null) Undo.DestroyObjectImmediate(meshRenderer);
+
+            var meshFilter = go.GetComponent<MeshFilter>();
+            if (meshFilter != null) Undo.DestroyObjectImmediate(meshFilter);
+
             EditorUtility.SetDirty(go);
             Debug.Log($"✓ [{go.name}] TextMeshPro → TextMeshProUGUI", go);
         }

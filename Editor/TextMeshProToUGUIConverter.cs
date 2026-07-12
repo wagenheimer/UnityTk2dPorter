@@ -125,6 +125,10 @@ public class TextMeshProToUGUIConverter : Editor
         if (mr != null)
             Undo.DestroyObjectImmediate(mr);
 
+        var mf = go.GetComponent<MeshFilter>();
+        if (mf != null)
+            Undo.DestroyObjectImmediate(mf);
+
         var tmpUGUI = go.AddComponent<TextMeshProUGUI>();
 
         EditorJsonUtility.FromJsonOverwrite(json, tmpUGUI);
