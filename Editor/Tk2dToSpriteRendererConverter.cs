@@ -137,8 +137,14 @@ public static class Tk2dSpriteRendererConverter
         Vector2 targetSize = Tk2dSpriteAssetUtility.CalculateTargetSize(spr, def, unitySprite);
 
         Tk2dSpriteAssetUtility.DestroyTk2dSpriteComponents(go, spr);
+        Tk2dSpriteAssetUtility.RemoveLegacyComponents(go);
 
         var spriteRenderer = go.AddComponent<SpriteRenderer>();
+        if (spriteRenderer == null)
+        {
+            Debug.LogError($"[Tk2dSpriteRendererConverter] Failed to add SpriteRenderer component to '{go.name}'.", go);
+            return false;
+        }
         spriteRenderer.sprite = unitySprite;
         spriteRenderer.color = color;
         spriteRenderer.flipX = flipX;
@@ -166,8 +172,6 @@ public static class Tk2dSpriteRendererConverter
                                  "Review manually if clipping is required.", go);
             }
         }
-
-        Tk2dSpriteAssetUtility.RemoveLegacyComponents(go);
 
         if (spriteType != typeof(tk2dSprite))
         {
