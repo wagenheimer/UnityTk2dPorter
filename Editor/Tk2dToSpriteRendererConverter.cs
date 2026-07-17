@@ -11,7 +11,7 @@ using System.Collections.Generic;
 /// </summary>
 public static class Tk2dSpriteRendererConverter
 {
-    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Convert tk2d → uGUI/Force Sprite Renderer (Selection)", false, 111)]
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Force Convert to Sprite Renderer (Selection)", false, 102)]
     private static void ConvertFromMenuItem()
     {
         var selected = Selection.gameObjects;
@@ -43,11 +43,62 @@ public static class Tk2dSpriteRendererConverter
         }
     }
 
-    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Convert tk2d → uGUI/Force Sprite Renderer (Selection)", true)]
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Force Convert to Sprite Renderer (Selection)", true)]
     private static bool ValidateConvertFromMenuItem()
     {
         var go = Selection.activeGameObject;
         return go != null && go.GetComponentInChildren<tk2dBaseSprite>(true) != null;
+    }
+
+    [MenuItem("CONTEXT/tk2dSprite/Convert to Sprite Renderer", false, 1000)]
+    private static void ConvertSpriteFromContext(MenuCommand command)
+    {
+        ConvertContext(command);
+    }
+
+    [MenuItem("CONTEXT/tk2dSlicedSprite/Convert to Sprite Renderer", false, 1000)]
+    private static void ConvertSlicedFromContext(MenuCommand command)
+    {
+        ConvertContext(command);
+    }
+
+    [MenuItem("CONTEXT/tk2dClippedSprite/Convert to Sprite Renderer", false, 1000)]
+    private static void ConvertClippedFromContext(MenuCommand command)
+    {
+        ConvertContext(command);
+    }
+
+    [MenuItem("CONTEXT/tk2dTiledSprite/Convert to Sprite Renderer", false, 1000)]
+    private static void ConvertTiledFromContext(MenuCommand command)
+    {
+        ConvertContext(command);
+    }
+
+    private static void ConvertContext(MenuCommand command)
+    {
+        if (command.context is tk2dBaseSprite spr)
+        {
+            Selection.activeObject = null;
+
+            Undo.SetCurrentGroupName("Convert tk2d to SpriteRenderer");
+            int group = Undo.GetCurrentGroup();
+
+            var converted = new List<GameObject>();
+            var log = new StringBuilder();
+            int count = 0;
+            ConvertRecursive(spr.gameObject, converted, log, ref count);
+
+            Undo.CollapseUndoOperations(group);
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            if (count > 0)
+            {
+                Debug.Log($"[Tk2dSpriteRendererConverter] Converted {count} tk2d sprite(s) to SpriteRenderer:\n{log}");
+                Selection.objects = converted.ToArray();
+            }
+        }
     }
 
     internal static void ConvertRecursive(GameObject root, List<GameObject> converted, StringBuilder log, ref int count)
