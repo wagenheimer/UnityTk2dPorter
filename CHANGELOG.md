@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.4] - 2026-07-17
+
+### Fixed
+- resolve NRE when converting tk2d to SpriteRenderer by destroying legacy Mesh components before adding SpriteRenderer
+
 ## [0.4.3] - 2026-07-12
 
 ### Fixed
