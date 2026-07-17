@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-07-17
+
+### Added
+- simplify conversion menus into root of Tools/Wagenheimer/Tk2d Porter/ and add CONTEXT menu support for converting individual components to SpriteRenderer
+
 ## [0.4.4] - 2026-07-17
 
 ### Fixed
