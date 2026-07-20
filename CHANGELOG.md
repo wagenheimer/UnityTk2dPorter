@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-07-20
+
+### Added
+- `SpriteRendererToImageConverter`: convert native Unity `SpriteRenderer` components directly to uGUI `Image` components via Context Menu (`CONTEXT/SpriteRenderer/Convert to Image (uGUI)`) and menu item (`Tools/Wagenheimer/Tk2d Porter/Convert SpriteRenderer → Image (Selection)`).
+
 ## [0.5.2] - 2026-07-20
 
 ## [0.5.1] - 2026-07-20
