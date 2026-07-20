@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [0.7.2] - 2026-07-20
 
+### Fixed
+- Unpack prefab instance root completely before reparenting under Canvas or converting Transform to RectTransform/Image, resolving Unity Editor errors when converting objects within prefab instances.
 ## [0.7.1] - 2026-07-20
 
 ### Fixed

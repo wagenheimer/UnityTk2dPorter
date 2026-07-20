@@ -103,8 +103,14 @@ public static class SpriteRendererToImageConverter
         bool flipX = sr.flipX;
         bool flipY = sr.flipY;
 
+        // Unpack prefab instance if part of a prefab before changing hierarchy or component types
+        UnpackIfPrefabInstance(go);
+
         // Ensure canvas parent exists
         Tk2dImageConverter.EnsureCanvasParent(go);
+
+        // Ensure RectTransform exists before adding Image
+        EnsureRectTransform(go);
 
         Undo.RegisterCompleteObjectUndo(go, "Convert SpriteRenderer to Image");
 
@@ -117,8 +123,19 @@ public static class SpriteRendererToImageConverter
         var mr = go.GetComponent<MeshRenderer>();
         if (mr != null) Undo.DestroyObjectImmediate(mr);
 
-        // Add Image component
-        var image = Undo.AddComponent<Image>(go);
+        // Add or get Image component safely
+        var image = go.GetComponent<Image>();
+        if (image == null)
+        {
+            image = Undo.AddComponent<Image>(go);
+        }
+
+        if (image == null)
+        {
+            Debug.LogError($"[SpriteRendererToImageConverter] Failed to add Image component to '{go.name}'.", go);
+            return false;
+        }
+
         image.sprite = sprite;
         image.color = color;
         image.raycastTarget = false; // Default false for decorative graphics
@@ -168,5 +185,42 @@ public static class SpriteRendererToImageConverter
         count++;
         log.AppendLine($"  \u2022 '{go.name}' \u2192 Image (Type: {image.type})");
         return true;
+    }
+
+    private static void UnpackIfPrefabInstance(GameObject go)
+    {
+        if (go == null) return;
+        if (PrefabUtility.IsPartOfPrefabInstance(go))
+        {
+            var root = PrefabUtility.GetOutermostPrefabInstanceRoot(go);
+            if (root != null)
+            {
+                PrefabUtility.UnpackPrefabInstance(root, PrefabUnpackMode.Completely, InteractionMode.UserAction);
+            }
+        }
+    }
+
+    private static RectTransform EnsureRectTransform(GameObject go)
+    {
+        var rt = go.GetComponent<RectTransform>();
+        if (rt != null) return rt;
+
+        UnpackIfPrefabInstance(go);
+
+        var t = go.transform;
+        Vector3 pos = t.localPosition;
+        Vector3 rot = t.localEulerAngles;
+        Vector3 scale = t.localScale;
+
+        rt = Undo.AddComponent<RectTransform>(go);
+
+        rt.localPosition = pos;
+        rt.localEulerAngles = rot;
+        rt.localScale = scale;
+        rt.anchorMin = Vector2.one * 0.5f;
+        rt.anchorMax = Vector2.one * 0.5f;
+        rt.pivot = Vector2.one * 0.5f;
+
+        return rt;
     }
 }

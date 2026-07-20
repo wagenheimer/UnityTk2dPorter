@@ -1134,6 +1134,9 @@ public static class Tk2dImageConverter
 
     internal static void EnsureCanvasParent(GameObject go)
     {
+        if (go == null) return;
+        UnpackIfPrefabInstance(go);
+
         if (go.GetComponentInParent<Canvas>() != null) return;
 
         var canvasGO = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -1143,6 +1146,19 @@ public static class Tk2dImageConverter
         canvasGO.transform.SetSiblingIndex(go.transform.GetSiblingIndex());
         go.transform.SetParent(canvasGO.transform, true);
         Undo.RegisterCreatedObjectUndo(canvasGO, "Create Canvas");
+    }
+
+    internal static void UnpackIfPrefabInstance(GameObject go)
+    {
+        if (go == null) return;
+        if (PrefabUtility.IsPartOfPrefabInstance(go))
+        {
+            var root = PrefabUtility.GetOutermostPrefabInstanceRoot(go);
+            if (root != null)
+            {
+                PrefabUtility.UnpackPrefabInstance(root, PrefabUnpackMode.Completely, InteractionMode.UserAction);
+            }
+        }
     }
 
     private static void EnsureRectTransform(GameObject go)
