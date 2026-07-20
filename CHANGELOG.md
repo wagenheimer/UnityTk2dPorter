@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [0.7.3] - 2026-07-20
 
+### Fixed
+- Prevent `SerializedObject target has been destroyed` in `TextMeshProToUGUIConverter` by unselecting target and calling `GUIUtility.ExitGUI()` after conversion.
+- Prevent `MissingReferenceException` in `SpriteRendererToImageConverter` by caching GameObject reference before destroying the `SpriteRenderer` component.
 ## [0.7.2] - 2026-07-20
 
 ### Fixed

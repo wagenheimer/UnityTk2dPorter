@@ -53,8 +53,11 @@ public static class SpriteRendererToImageConverter
     [MenuItem("CONTEXT/SpriteRenderer/Convert to Image (uGUI)", false, 1000)]
     private static void ConvertFromContext(MenuCommand command)
     {
-        if (command.context is SpriteRenderer sr)
+        if (command.context is SpriteRenderer sr && sr != null)
         {
+            GameObject targetGO = sr.gameObject;
+            string objectName = targetGO != null ? targetGO.name : "SpriteRenderer";
+
             Selection.activeObject = null;
 
             Undo.SetCurrentGroupName("Convert SpriteRenderer to Image");
@@ -73,7 +76,7 @@ public static class SpriteRendererToImageConverter
 
             if (count > 0)
             {
-                Debug.Log($"[SpriteRendererToImageConverter] Converted SpriteRenderer on '{sr.gameObject.name}' to Image:\n{log}");
+                Debug.Log($"[SpriteRendererToImageConverter] Converted SpriteRenderer on '{objectName}' to Image:\n{log}");
                 Selection.objects = converted.ToArray();
             }
         }

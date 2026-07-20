@@ -11,22 +11,32 @@ public class TextMeshProToUGUIConverter : TMP_EditorPanel
 {
     public override void OnInspectorGUI()
     {
-        DrawConvertButton();
+        if (target == null || serializedObject.targetObject == null) return;
+
+        bool didConvert = DrawConvertButton();
+        if (didConvert || target == null || serializedObject.targetObject == null)
+        {
+            GUIUtility.ExitGUI();
+            return;
+        }
+
         EditorGUILayout.Space(5);
         base.OnInspectorGUI();
     }
 
-    private void DrawConvertButton()
+    private bool DrawConvertButton()
     {
+        bool didConvert = false;
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
         EditorGUILayout.LabelField("TMP \u2192 TMP_UGUI Converter", EditorStyles.boldLabel);
 
         if (GUILayout.Button("Convert to TextMeshProUGUI", GUILayout.Height(30)))
         {
             ConvertSelection();
+            didConvert = true;
         }
 
-        if (targets.Length > 1)
+        if (targets != null && targets.Length > 1)
         {
             EditorGUILayout.HelpBox(
                 $"{targets.Length} TextMeshPro components selected. All will be converted.",
@@ -34,25 +44,28 @@ public class TextMeshProToUGUIConverter : TMP_EditorPanel
         }
 
         EditorGUILayout.EndVertical();
+        return didConvert;
     }
 
     private void ConvertSelection()
     {
+        Selection.activeObject = null;
+
         int count = 0;
         StringBuilder log = new StringBuilder();
-        var converted = new GameObject[targets.Length];
+        var convertedList = new List<GameObject>();
 
         Undo.SetCurrentGroupName("Convert TMP to TMP_UGUI");
         int group = Undo.GetCurrentGroup();
 
         for (int i = 0; i < targets.Length; i++)
         {
-            if (targets[i] is TextMeshPro tmp)
+            if (targets[i] is TextMeshPro tmp && tmp != null)
             {
                 var go = tmp.gameObject;
                 if (Convert(tmp))
                 {
-                    converted[count] = go;
+                    convertedList.Add(go);
                     log.AppendLine($"  \u2022 {go.name}");
                     count++;
                 }
@@ -64,10 +77,7 @@ public class TextMeshProToUGUIConverter : TMP_EditorPanel
         if (count > 0)
         {
             Debug.Log($"Converted {count} TextMeshPro(s) to TextMeshProUGUI:\n{log}");
-
-            var selected = new GameObject[count];
-            System.Array.Copy(converted, selected, count);
-            Selection.objects = selected;
+            Selection.objects = convertedList.ToArray();
         }
     }
 
