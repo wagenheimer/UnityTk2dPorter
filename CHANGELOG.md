@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2026-07-20
+
+### Fixed
+- Add missing `SpriteRendererToImageConverter.cs.meta` file required for Unity Package Manager (UPM) to recognize and compile the converter script.
+
 ## [0.7.0] - 2026-07-20
 
 ## [0.6.0] - 2026-07-20
