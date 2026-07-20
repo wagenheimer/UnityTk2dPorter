@@ -2,17 +2,18 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEditor;
 using TMPro;
+using TMPro.EditorUtilities;
 using System.Text;
 
 [CustomEditor(typeof(TextMeshPro))]
 [CanEditMultipleObjects]
-public class TextMeshProToUGUIConverter : Editor
+public class TextMeshProToUGUIConverter : TMP_EditorPanel
 {
     public override void OnInspectorGUI()
     {
         DrawConvertButton();
         EditorGUILayout.Space(5);
-        DrawDefaultInspector();
+        base.OnInspectorGUI();
     }
 
     private void DrawConvertButton()

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1] - 2026-07-20
+
+### Fixed
+- Inherit `TextMeshProToUGUIConverter` from `TMP_EditorPanel` instead of `Editor` to preserve TextMeshPro's native rich inspector UI while keeping the conversion button.
+
 ## [0.5.0] - 2026-07-17
 
 ### Added
