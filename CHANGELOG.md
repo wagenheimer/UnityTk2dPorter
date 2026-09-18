@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.5] - 2026-09-18
+
+### Changed
+- **Centralized Update Management**: Replaced standalone update checker with dependency on `com.wagenheimer.packagehub` (`UnityPackageHub`). Updates, changelogs, and package management are now handled centrally through the unified Wagenheimer Package Hub.
+
 ## [0.7.4] - 2026-07-20
 
 ## [0.7.3] - 2026-07-20

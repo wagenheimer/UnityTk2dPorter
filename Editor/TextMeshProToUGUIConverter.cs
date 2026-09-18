@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using UnityEditor;
 using TMPro;
 using TMPro.EditorUtilities;
+using System.Collections.Generic;
 using System.Text;
 
 [CustomEditor(typeof(TextMeshPro))]

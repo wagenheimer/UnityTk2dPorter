@@ -1,7 +1,9 @@
 {
   "name": "Wagenheimer.Tk2dPorter.Editor",
   "rootNamespace": "",
-  "references": [],
+  "references": [
+    "Wagenheimer.PackageHub.Editor"
+  ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
