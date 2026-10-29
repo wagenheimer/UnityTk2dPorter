@@ -69,6 +69,7 @@ Or add it manually to `Packages/manifest.json`:
   }
 }
 ```
+The package also installs [Wagenheimer Package Hub](https://github.com/wagenheimer/UnityPackageHub) as an unpinned dependency, so update checks always use the latest Hub.
 
 ---
 
