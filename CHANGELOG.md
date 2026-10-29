@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.1] - 2026-10-29
+
+### Changed
+- chore(deps): use the unpinned Package Hub git URL
+- chore(deps): bump PackageHub dependency to v1.0.5
+- chore: update UnityPackageHub dependency to v1.0.1
+
 ## [0.8.0] - 2026-09-18
 
 ## [0.7.5] - 2026-09-18
