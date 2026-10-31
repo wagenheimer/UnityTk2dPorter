@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.2] - 2026-10-31
+
+### Fixed
+- replace obsolete enableWordWrapping with textWrappingMode for TMP
+
+### Changed
+- chore: add issue and pull request templates [skip ci]
+- chore: add issue/PR templates and ecosystem footer [skip ci]
+
 ## [0.8.1] - 2026-10-29
 
 ### Changed
