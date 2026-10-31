@@ -106,7 +106,7 @@ public class TextMeshProToUGUIConverter : TMP_EditorPanel
         FontStyles fontStyle = tmp.fontStyle;
         bool richText = tmp.richText;
         bool raycastTarget = tmp.raycastTarget;
-        bool enableWordWrapping = tmp.enableWordWrapping;
+        TextWrappingModes textWrappingMode = tmp.textWrappingMode;
         TextOverflowModes overflowMode = tmp.overflowMode;
         float lineSpacing = tmp.lineSpacing;
         float characterSpacing = tmp.characterSpacing;
@@ -155,7 +155,7 @@ public class TextMeshProToUGUIConverter : TMP_EditorPanel
         tmpUGUI.fontStyle = fontStyle;
         tmpUGUI.richText = richText;
         tmpUGUI.raycastTarget = raycastTarget;
-        tmpUGUI.enableWordWrapping = enableWordWrapping;
+        tmpUGUI.textWrappingMode = textWrappingMode;
         tmpUGUI.overflowMode = overflowMode;
         tmpUGUI.lineSpacing = lineSpacing;
         tmpUGUI.characterSpacing = characterSpacing;

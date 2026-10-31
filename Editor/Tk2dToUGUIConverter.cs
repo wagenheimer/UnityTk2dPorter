@@ -724,7 +724,7 @@ public static class Tk2dImageConverter
             TextAlignmentOptions alignment = textMeshPro.alignment;
             FontStyles fontStyle = textMeshPro.fontStyle;
             bool richText = textMeshPro.richText;
-            bool enableWordWrapping = textMeshPro.enableWordWrapping;
+            TextWrappingModes textWrappingMode = textMeshPro.textWrappingMode;
             TextOverflowModes overflowMode = textMeshPro.overflowMode;
             float lineSpacing = textMeshPro.lineSpacing;
             float charSpacing = textMeshPro.characterSpacing;
@@ -749,7 +749,7 @@ public static class Tk2dImageConverter
             tmpUGUI.fontStyle = fontStyle;
             tmpUGUI.richText = richText;
             tmpUGUI.raycastTarget = true;
-            tmpUGUI.enableWordWrapping = enableWordWrapping;
+            tmpUGUI.textWrappingMode = textWrappingMode;
             tmpUGUI.overflowMode = overflowMode;
             tmpUGUI.lineSpacing = lineSpacing;
             tmpUGUI.characterSpacing = charSpacing;
