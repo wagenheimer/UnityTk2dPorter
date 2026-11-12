@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.3] - 2026-11-12
+
+### Changed
+- chore: ignore Git Bash crash dumps (*.stackdump)
+
 ## [0.8.2] - 2026-10-31
 
 ### Fixed
