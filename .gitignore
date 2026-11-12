@@ -30,3 +30,7 @@ Thumbs.db
 *.csproj
 *.sln
 *.unityproj
+
+# Git Bash crash dumps
+*.stackdump
+*.stackdump.meta
