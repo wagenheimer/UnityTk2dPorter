@@ -103,6 +103,26 @@ The package also installs [Wagenheimer Package Hub](https://github.com/wagenheim
 
 ## Usage
 
+### 0. Migrating a scene end-to-end (recommended order)
+
+Converting the sprites is only half of the migration: destroying a `tk2dUIItem`/`tk2dSprite`
+also breaks every serialized field in your scripts that pointed at it, and Unity cannot remap an
+object reference when the field's declared type changes. The safe workflow is:
+
+1. **Snapshot tk2d references** — `Tools/Wagenheimer/Tk2d Porter/References/Snapshot tk2d References
+   (Selection or Open Scene)`. Writes `Logs/tk2d-refs-<scene>-<date>.json` with every serialized
+   field whose declared type is a tk2d component, keyed by `GlobalObjectId` (stable across reparenting).
+2. **Convert the content** (scene/prefab) with the converters below.
+3. **Migrate the script field types** — `Migrate tk2d Script Fields → uGUI (Dry Run Report)`, review
+   it, then `(Apply)`. Recompile and fix the reported API call sites (`.SetSprite`, `.IsOn`,
+   `.Enabled`, `.dimensions`, custom drag components, ...).
+4. **Remap the references** — `Remap from Latest Snapshot (Open Scene)`. It finds the new
+   `Image`/`Button`/`Toggle`/`Slider`/`SpriteRenderer` on the same GameObject and assigns it to the
+   migrated field. A Markdown report lists anything that needs a manual fix.
+
+Doing step 3 across the whole project before the scenes are converted will leave the not-yet-converted
+scenes with `None` references — snapshot/convert/remap one scene (or the whole game) at a time.
+
 ### 1. Convert scene/prefab content
 
 Select one or more GameObjects containing tk2d sprites, then use one of:

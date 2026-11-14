@@ -24,6 +24,10 @@ public static class Tk2dImageConverter
     // looks misplaced until Play).
     private static readonly List<Canvas> CreatedCanvases = new List<Canvas>();
 
+    // Canvas reused for every root in the same batch: selecting several HUD
+    // roots must not create several overlapping overlay canvases.
+    private static Canvas _batchCanvas;
+
     [MenuItem("Tools/Wagenheimer/Tk2d Porter/Force Convert to uGUI Image (Selection)", false, 101)]
     private static void ConvertFromMenuItem()
     {
@@ -39,7 +43,7 @@ public static class Tk2dImageConverter
         Selection.activeObject = null;
 
         _missingButtonControllerWarned = false;
-        CreatedCanvases.Clear();
+        BeginCanvasBatch();
 
         Undo.SetCurrentGroupName("Convert tk2d to uGUI Image");
         int group = Undo.GetCurrentGroup();
@@ -127,7 +131,7 @@ public static class Tk2dImageConverter
         {
             Selection.activeObject = null;
             _missingButtonControllerWarned = false;
-            CreatedCanvases.Clear();
+            BeginCanvasBatch();
 
             Undo.SetCurrentGroupName("Convert tk2d to uGUI Image");
             int group = Undo.GetCurrentGroup();
@@ -189,6 +193,17 @@ public static class Tk2dImageConverter
 
         if (removed > 0)
             Debug.Log($"[Tk2dConverter] '{root.name}': {removed} orphaned tk2dUI component(s) removed in final cleanup.");
+
+        // tk2dCameraAnchor rewrites transform.position every frame to stay
+        // pinned to the camera. On a RectTransform inside a screen-space canvas
+        // that puts the element at a screen-space world position and breaks the
+        // layout, so it must not survive the conversion.
+        foreach (var anchor in root.GetComponentsInChildren<tk2dCameraAnchor>(true))
+        {
+            if (anchor == null) continue;
+            Debug.Log($"[Tk2dConverter]   Removing '{anchor.GetType().Name}' on '{anchor.gameObject.name}' — the Canvas now handles the anchoring.", anchor.gameObject);
+            Undo.DestroyObjectImmediate(anchor);
+        }
     }
 
     internal static void ConvertRecursive(GameObject root, List<GameObject> converted, StringBuilder log, ref int count)
@@ -1227,6 +1242,7 @@ public static class Tk2dImageConverter
     internal static void BeginCanvasBatch()
     {
         CreatedCanvases.Clear();
+        _batchCanvas = null;
     }
 
     /// <summary>
@@ -1271,46 +1287,56 @@ public static class Tk2dImageConverter
         // world height as the reference height. (ConstantPixelSize with a
         // baked scaleFactor would freeze the HUD at the editor's resolution.)
         var camera = ResolveSceneCamera();
-        float referenceHeight = camera != null && camera.orthographic && camera.orthographicSize > 0f
-            ? camera.orthographicSize * 2f
-            : 960f;
+        Vector3 worldPosition = go.transform.position;
+        Vector3 cameraPosition = camera != null ? camera.transform.position : Vector3.zero;
 
-        float aspect = Screen.height > 0 ? (float)Screen.width / Screen.height : 16f / 9f;
+        // One canvas per batch: converting several HUD roots of the same camera
+        // must not create several overlapping overlay canvases (they would all
+        // share sortingOrder 0 and the sibling order would decide the layering).
+        Canvas canvas = _batchCanvas;
 
-        var canvasGO = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-        var canvas = canvasGO.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        if (canvas == null)
+        {
+            float referenceHeight = camera != null && camera.orthographic && camera.orthographicSize > 0f
+                ? camera.orthographicSize * 2f
+                : 960f;
 
-        var scaler = canvasGO.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(referenceHeight * aspect, referenceHeight);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 1f; // match height, exactly like the tk2d camera
+            float aspect = Screen.height > 0 ? (float)Screen.width / Screen.height : 16f / 9f;
 
-        // An overlay canvas is screen-space and must be a root object; nesting
-        // it under the converted hierarchy would make Unity fight over its
-        // position every frame.
-        canvasGO.transform.SetParent(null, false);
-        canvasGO.transform.SetAsLastSibling();
-        CreatedCanvases.Add(canvas);
+            var canvasGO = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            canvas = canvasGO.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            var scaler = canvasGO.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(referenceHeight * aspect, referenceHeight);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 1f; // match height, exactly like the tk2d camera
+
+            // An overlay canvas is screen-space and must be a root object;
+            // nesting it under the converted hierarchy would make Unity fight
+            // over its position every frame.
+            canvasGO.transform.SetParent(null, false);
+            canvasGO.transform.SetAsLastSibling();
+            Undo.RegisterCreatedObjectUndo(canvasGO, "Create Canvas");
+
+            CreatedCanvases.Add(canvas);
+            _batchCanvas = canvas;
+
+            Debug.Log($"[Tk2dConverter] Created Canvas '{canvasGO.name}' — reference {scaler.referenceResolution.x:0}x{scaler.referenceResolution.y:0}, " +
+                      "match=height (1 canvas unit = 1 tk2d world unit at any resolution).");
+        }
 
         // Reparent WITHOUT preserving the world position: an overlay canvas'
         // world origin is the bottom-left of the screen, not the camera's world
         // origin. Reproducing tk2d's layout means "1 canvas unit = 1 world
         // unit, with the canvas center at the camera's position", so the local
-        // position is simply world − camera (xy).
-        Vector3 worldPosition = go.transform.position;
-        Vector3 cameraPosition = camera != null ? camera.transform.position : Vector3.zero;
-
-        go.transform.SetParent(canvasGO.transform, false);
+        // position is simply world − camera (xy). Roots are appended in
+        // selection order, which becomes the uGUI draw order.
+        go.transform.SetParent(canvas.transform, false);
         go.transform.localPosition = new Vector3(worldPosition.x - cameraPosition.x,
                                                   worldPosition.y - cameraPosition.y,
                                                   0f);
-
-        Undo.RegisterCreatedObjectUndo(canvasGO, "Create Canvas");
-
-        Debug.Log($"[Tk2dConverter] Created Canvas '{canvasGO.name}' — reference {scaler.referenceResolution.x:0}x{scaler.referenceResolution.y:0}, " +
-                  "match=height (1 canvas unit = 1 tk2d world unit at any resolution).");
     }
 
     /// <summary>

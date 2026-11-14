@@ -47,6 +47,15 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
 - **UI border scaling:** `Image.pixelsPerUnitMultiplier = sprite.pixelsPerUnit /
   canvas.referencePixelsPerUnit` keeps 1 texel = 1 canvas unit for Sliced/Tiled images. Forgetting it
   makes 9-slice borders 100x too big when the canvas uses Reference PPU 100.
+- **Script references break by design.** Destroying a tk2d component nulls every serialized field of
+  that type; the field type must be migrated *and* the reference rebuilt. Use
+  `Tk2dReferenceRemapper` (snapshot before conversion, remap after recompiling) — it keys entries by
+  `GlobalObjectId` because conversion reparents roots under a Canvas, so path lookup would not work.
+- **`tk2dCameraAnchor` must be removed** after converting to uGUI: it rewrites `transform.position`
+  every frame against the camera, which breaks a RectTransform inside a screen-space Canvas.
+- **One canvas per batch**: several selected HUD roots share the canvas created by the first one
+  (otherwise each root would get its own overlay canvas at sortingOrder 0 and the layering would be
+  wrong). Selection order becomes the canvas child (draw) order.
 
 - **Why `Editor/` (root) has NO `.asmdef`, unlike every sibling `wagenheimer/Unity*` package.**
   2D Toolkit (`Assets/TK2DROOT`) ships as raw, loose `.cs` source with no `.asmdef` of its own — it
