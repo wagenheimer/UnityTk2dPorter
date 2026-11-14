@@ -1,8 +1,21 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace Wagenheimer.Tk2dPorter
 {
+    /// <summary>
+    /// One name → sprite pair. The name is the tk2d sprite NAME, which is not
+    /// always the sprite asset name (duplicate definitions get suffixes such as
+    /// "club_2 1"), so the library must store the pair explicitly.
+    /// </summary>
+    [Serializable]
+    public class SpriteEntry
+    {
+        public string name;
+        public Sprite sprite;
+    }
+
     /// <summary>
     /// Name → Sprite lookup that replaces <c>tk2dSprite.SetSprite(string)</c>.
     ///
@@ -14,11 +27,11 @@ namespace Wagenheimer.Tk2dPorter
     [CreateAssetMenu(menuName = "Wagenheimer/Tk2d Porter/Sprite Library", fileName = "SpriteLibrary")]
     public class SpriteLibrary : ScriptableObject
     {
-        [Tooltip("Every sprite that can be requested by name.")]
-        public Sprite[] sprites;
+        [Tooltip("Explicit tk2d sprite name → Sprite pairs. This is the authoritative map.")]
+        public SpriteEntry[] entries;
 
-        [Tooltip("Resources name used to load this asset at runtime (file name without extension).")]
-        public string resourcesName = "SpriteLibrary";
+        [Tooltip("Legacy fallback: sprites indexed by their asset name (used when 'entries' is empty).")]
+        public Sprite[] sprites;
 
         private Dictionary<string, Sprite> _map;
         private static SpriteLibrary _instance;
@@ -46,7 +59,18 @@ namespace Wagenheimer.Tk2dPorter
 
             if (_map == null)
             {
-                _map = new Dictionary<string, Sprite>(sprites != null ? sprites.Length : 0);
+                _map = new Dictionary<string, Sprite>();
+
+                if (entries != null)
+                {
+                    foreach (var entry in entries)
+                    {
+                        if (entry == null || entry.sprite == null || string.IsNullOrEmpty(entry.name)) continue;
+                        if (!_map.ContainsKey(entry.name))
+                            _map.Add(entry.name, entry.sprite);
+                    }
+                }
+
                 if (sprites != null)
                 {
                     foreach (var sprite in sprites)

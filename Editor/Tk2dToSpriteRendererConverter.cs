@@ -223,6 +223,15 @@ public static class Tk2dSpriteRendererConverter
         spriteRenderer.flipY = flipY;
         spriteRenderer.sortingOrder = sortingOrder;
 
+        // tk2d output was unlit. URP's Sprite-Lit default washes colors out when
+        // the scene has no 2D light, so keep the built-in unlit material unless
+        // the project opts out.
+        if (Tk2dPorterSettings.Instance.useUnlitSpriteMaterial)
+        {
+            var unlit = Tk2dSpriteAssetUtility.GetUnlitSpriteMaterial();
+            if (unlit != null) spriteRenderer.sharedMaterial = unlit;
+        }
+
         if (spriteType == typeof(tk2dSlicedSprite))
         {
             spriteRenderer.drawMode = SpriteDrawMode.Sliced;

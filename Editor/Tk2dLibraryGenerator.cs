@@ -61,6 +61,14 @@ public static class Tk2dLibraryGenerator
         // ---- SpriteLibrary ----
         var spriteLibrary = LoadOrCreate<SpriteLibrary>(settings.spriteLibraryPath);
         spriteLibrary.sprites = spriteMap.Values.OrderBy(s => s.name).ToArray();
+
+        // The authoritative map is tk2d NAME -> Sprite: duplicate definitions
+        // get suffixes ("club_2 1") that the sprite asset name does not carry.
+        spriteLibrary.entries = spriteMap
+            .OrderBy(kv => kv.Key)
+            .Select(kv => new SpriteEntry { name = kv.Key, sprite = kv.Value })
+            .ToArray();
+
         EditorUtility.SetDirty(spriteLibrary);
 
         // ---- AnimationLibrary ----

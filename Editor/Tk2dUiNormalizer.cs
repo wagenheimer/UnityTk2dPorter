@@ -59,4 +59,44 @@ public static class Tk2dUiNormalizer
         var go = Selection.activeGameObject;
         return go != null && go.GetComponentInChildren<Image>(true) != null;
     }
+
+    /// <summary>
+    /// Assigns the built-in unlit sprite material to every SpriteRenderer in the
+    /// selection. tk2d rendered unlit; URP's Sprite-Lit default washes converted
+    /// sprites out when the scene has no 2D light.
+    /// </summary>
+    [MenuItem("Tools/Wagenheimer/Tk2d Porter/Re-apply unlit sprite material (Selection)", false, 151)]
+    private static void ReapplyUnlitSpriteMaterial()
+    {
+        var roots = Selection.gameObjects;
+        if (roots == null || roots.Length == 0) return;
+
+        var material = Tk2dSpriteAssetUtility.GetUnlitSpriteMaterial();
+        if (material == null)
+        {
+            Debug.LogError("[Tk2dPorter] Could not resolve an unlit sprite material.");
+            return;
+        }
+
+        int changed = 0;
+
+        Undo.SetCurrentGroupName("Re-apply unlit sprite material");
+        int group = Undo.GetCurrentGroup();
+
+        foreach (var root in roots)
+        {
+            foreach (var renderer in root.GetComponentsInChildren<SpriteRenderer>(true))
+            {
+                if (renderer.sharedMaterial == material) continue;
+
+                Undo.RecordObject(renderer, "Re-apply unlit sprite material");
+                renderer.sharedMaterial = material;
+                EditorUtility.SetDirty(renderer);
+                changed++;
+            }
+        }
+
+        Undo.CollapseUndoOperations(group);
+        Debug.Log($"[Tk2dPorter] Assigned the unlit sprite material to {changed} SpriteRenderer(s).");
+    }
 }

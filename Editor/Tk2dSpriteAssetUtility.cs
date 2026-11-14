@@ -671,6 +671,36 @@ internal static class Tk2dSpriteAssetUtility
         }
     }
 
+    /// <summary>
+    /// Built-in unlit sprite material. tk2d rendered unlit; URP's default for a
+    /// SpriteRenderer is Sprite-Lit-Default, which washes the sprite out when the
+    /// scene has no 2D light. The built-in Sprites-Default material keeps the
+    /// original colors.
+    /// </summary>
+    internal static Material GetUnlitSpriteMaterial()
+    {
+        var builtin = Resources.GetBuiltinResource<Material>("Sprites-Default.mat");
+        if (builtin != null) return builtin;
+
+        // Some render pipelines do not expose the built-in material by that
+        // name: fall back to a small persistent asset with the unlit shader.
+        const string path = "Assets/Tk2dPorter/SpriteUnlit.mat";
+        var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (material != null) return material;
+
+        var shader = Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default")
+                     ?? Shader.Find("Sprites/Default");
+        if (shader == null) return null;
+
+        if (!AssetDatabase.IsValidFolder("Assets/Tk2dPorter"))
+            AssetDatabase.CreateFolder("Assets", "Tk2dPorter");
+
+        material = new Material(shader);
+        AssetDatabase.CreateAsset(material, path);
+        AssetDatabase.SaveAssets();
+        return material;
+    }
+
     private static void WarnOnce(string key, string message)
     {
         if (!WarnedTextures.Add(key)) return;

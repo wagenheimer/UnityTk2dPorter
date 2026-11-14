@@ -27,6 +27,9 @@ public class Tk2dPorterSettings : ScriptableObject
     [Tooltip("Disable an unsupported tk2dSpriteAnimator instead of leaving it active (it throws once its tk2dBaseSprite is gone).")]
     public bool disableUnsupportedAnimators = true;
 
+    [Tooltip("Assign the built-in unlit sprite material to converted SpriteRenderers. tk2d sprites were unlit; URP's default Sprite-Lit material washes them out unless the scene has a 2D light.")]
+    public bool useUnlitSpriteMaterial = true;
+
     [Header("UI")]
     [Tooltip("Canvas created when converting world content to uGUI.")]
     public CanvasScaleMode canvasScaleMode = CanvasScaleMode.HeightMatch;
