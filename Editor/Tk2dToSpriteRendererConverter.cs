@@ -26,6 +26,12 @@ public static class Tk2dSpriteRendererConverter
         Undo.SetCurrentGroupName("Convert tk2d to SpriteRenderer");
         int group = Undo.GetCurrentGroup();
 
+        // One reimport per atlas instead of one per sprite (see Prewarm).
+        var prewarmSprites = new List<tk2dBaseSprite>();
+        foreach (var go in selected)
+            prewarmSprites.AddRange(go.GetComponentsInChildren<tk2dBaseSprite>(true));
+        Tk2dSpriteAssetUtility.Prewarm(prewarmSprites);
+
         foreach (var go in selected)
         {
             ConvertRecursive(go, converted, log, ref count);
@@ -86,6 +92,8 @@ public static class Tk2dSpriteRendererConverter
             var converted = new List<GameObject>();
             var log = new StringBuilder();
             int count = 0;
+
+            Tk2dSpriteAssetUtility.Prewarm(spr.gameObject.GetComponentsInChildren<tk2dBaseSprite>(true));
             ConvertRecursive(spr.gameObject, converted, log, ref count);
 
             Undo.CollapseUndoOperations(group);
@@ -148,10 +156,7 @@ public static class Tk2dSpriteRendererConverter
             return false;
         }
 
-        if (PrefabUtility.IsPartOfPrefabInstance(go))
-        {
-            PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.UserAction);
-        }
+        Tk2dSpriteAssetUtility.UnpackIfPrefabInstance(go);
 
         Undo.RegisterCompleteObjectUndo(go, "Convert tk2d to SpriteRenderer");
 
@@ -179,7 +184,7 @@ public static class Tk2dSpriteRendererConverter
 
         bool isSliced = spriteType == typeof(tk2dSlicedSprite);
 
-        Sprite unitySprite = Tk2dSpriteAssetUtility.FindOrCreateSpriteAsset(def, isSliced, slicedBorderBL, slicedBorderTR);
+        Sprite unitySprite = Tk2dSpriteAssetUtility.FindOrCreateSpriteAsset(spr, def, isSliced, slicedBorderBL, slicedBorderTR);
         if (unitySprite == null)
         {
             Debug.LogWarning($"'{go.name}': Could not find/create Sprite asset for '{def.name}'. Creating SpriteRenderer with null sprite.", go);
@@ -187,8 +192,23 @@ public static class Tk2dSpriteRendererConverter
 
         Vector2 targetSize = Tk2dSpriteAssetUtility.CalculateTargetSize(spr, def, unitySprite);
 
+        // tk2d bakes its own scale into the mesh vertices; a SpriteRenderer
+        // renders at the sprite's PixelsPerUnit. Capture the correction before
+        // the tk2d component is destroyed.
+        Vector2 worldScale = Tk2dSpriteAssetUtility.CalculateWorldScale(spr, unitySprite);
+
         Tk2dSpriteAssetUtility.DestroyTk2dSpriteComponents(go, spr);
-        Tk2dSpriteAssetUtility.RemoveLegacyComponents(go);
+
+        // World-space colliders are frequently load-bearing (custom drag/drop
+        // and click handling queries them) — keep them and let the project
+        // decide whether to switch to 2D physics.
+        Tk2dSpriteAssetUtility.RemoveLegacyComponents(go, destroyColliders: false);
+
+        if (go.GetComponent<BoxCollider>() != null || go.GetComponent<BoxCollider2D>() != null)
+        {
+            Debug.Log($"[Tk2dSpriteRendererConverter] '{go.name}': collider preserved as-is. " +
+                      "If the project moves to 2D physics, replace it with a Collider2D manually.", go);
+        }
 
         var spriteRenderer = go.AddComponent<SpriteRenderer>();
         if (spriteRenderer == null)
@@ -216,6 +236,16 @@ public static class Tk2dSpriteRendererConverter
         {
             spriteRenderer.drawMode = SpriteDrawMode.Simple;
 
+            // Simple sprites get their size from the sprite asset itself, so
+            // the tk2d scale (and the asset's PixelsPerUnit) must be applied to
+            // the transform or the sprite would render at a different size.
+            // Sliced/Tiled already carry the size in spriteRenderer.size.
+            var localScale = go.transform.localScale;
+            go.transform.localScale = new Vector3(
+                localScale.x * worldScale.x,
+                localScale.y * worldScale.y,
+                localScale.z);
+
             if (spriteType == typeof(tk2dClippedSprite))
             {
                 Debug.LogWarning($"'{go.name}': tk2dClippedSprite has no native fill/clip equivalent on " +
@@ -223,6 +253,9 @@ public static class Tk2dSpriteRendererConverter
                                  "Review manually if clipping is required.", go);
             }
         }
+
+        Tk2dSpriteAssetUtility.DisableUnsupportedAnimator(go);
+
 
         if (spriteType != typeof(tk2dSprite))
         {

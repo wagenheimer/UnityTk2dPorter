@@ -28,6 +28,8 @@ public static class Tk2dConversionRouter
         var uiConverted = new List<GameObject>();
         var spriteConverted = new List<GameObject>();
 
+        Tk2dImageConverter.BeginCanvasBatch();
+
         Undo.SetCurrentGroupName("Convert tk2d (auto-detect)");
         int group = Undo.GetCurrentGroup();
 
@@ -53,6 +55,7 @@ public static class Tk2dConversionRouter
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
+        Tk2dImageConverter.RefreshCreatedCanvases();
 
         if (uiCount > 0)
             Debug.Log($"[Tk2dConverter] {uiCount} sprite(s) converted to Image:\n{uiLog}");

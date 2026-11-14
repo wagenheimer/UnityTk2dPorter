@@ -18,17 +18,11 @@ public static class Tk2dImageConverter
     // per conversion batch (several buttons in the same selection).
     private static bool _missingButtonControllerWarned = false;
 
-    // tk2dUI*-prefixed components that are the CONSUMING PROJECT'S OWN
-    // GAMEPLAY LOGIC (e.g. custom drag-and-drop), not native tk2d visual
-    // components — must never be auto-destroyed by the purge, even though the
-    // name starts with "tk2dUI". Add any new custom class created under that
-    // naming convention here.
-    private static readonly HashSet<string> Tk2dUITypeNamesToPreserve = new HashSet<string>
-    {
-        "tk2dUIDragItemGrid",
-        "tk2dUIDragItemClamp",
-        "tk2dUIManager",
-    };
+    // Canvases created during the current batch, refreshed once at the end so
+    // the CanvasScaler applies immediately (otherwise the new canvas keeps the
+    // stale screen rect until the next editor update and the converted layout
+    // looks misplaced until Play).
+    private static readonly List<Canvas> CreatedCanvases = new List<Canvas>();
 
     [MenuItem("Tools/Wagenheimer/Tk2d Porter/Force Convert to uGUI Image (Selection)", false, 101)]
     private static void ConvertFromMenuItem()
@@ -45,11 +39,18 @@ public static class Tk2dImageConverter
         Selection.activeObject = null;
 
         _missingButtonControllerWarned = false;
+        CreatedCanvases.Clear();
 
         Undo.SetCurrentGroupName("Convert tk2d to uGUI Image");
         int group = Undo.GetCurrentGroup();
 
         Debug.Log($"[Tk2dConverter] Starting conversion of {selected.Length} selected object(s)...");
+
+        // One reimport per atlas instead of one per sprite (see Prewarm).
+        var prewarmSprites = new List<tk2dBaseSprite>();
+        foreach (var go in selected)
+            prewarmSprites.AddRange(go.GetComponentsInChildren<tk2dBaseSprite>(true));
+        Tk2dSpriteAssetUtility.Prewarm(prewarmSprites);
 
         foreach (var go in selected)
         {
@@ -62,6 +63,7 @@ public static class Tk2dImageConverter
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
+        RefreshCreatedCanvases();
 
         Debug.Log($"[Tk2dConverter] Conversion finished. {count} sprite(s) converted.");
 
@@ -125,6 +127,7 @@ public static class Tk2dImageConverter
         {
             Selection.activeObject = null;
             _missingButtonControllerWarned = false;
+            CreatedCanvases.Clear();
 
             Undo.SetCurrentGroupName("Convert tk2d to uGUI Image");
             int group = Undo.GetCurrentGroup();
@@ -141,6 +144,7 @@ public static class Tk2dImageConverter
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+            RefreshCreatedCanvases();
 
             if (count > 0)
                 Debug.Log($"Converted {count} tk2d sprite(s) to Image:\n{log}");
@@ -165,9 +169,9 @@ public static class Tk2dImageConverter
             string typeName = comp.GetType().Name;
             if (!typeName.StartsWith("tk2dUI")) continue;
 
-            if (Tk2dUITypeNamesToPreserve.Contains(typeName))
+            if (!IsRemovableTk2dUIComponent(comp))
             {
-                Debug.LogWarning($"[Tk2dConverter]   Preserving '{typeName}' on '{comp.gameObject.name}' — it's on the exclusion list (gameplay logic, not a tk2d visual).", comp.gameObject);
+                Debug.Log($"[Tk2dConverter]   Preserving '{typeName}' on '{comp.gameObject.name}' — it is not a tk2d-owned visual component (custom project script or shared tk2d service).", comp.gameObject);
                 continue;
             }
 
@@ -262,10 +266,7 @@ public static class Tk2dImageConverter
 
             try
             {
-                if (PrefabUtility.IsPartOfPrefabInstance(go))
-                {
-                    PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.UserAction);
-                }
+                Tk2dSpriteAssetUtility.UnpackIfPrefabInstance(go);
 
                 EnsureRectTransform(go);
                 Undo.RegisterCompleteObjectUndo(go, "Convert tk2d Scrollbar Root");
@@ -353,10 +354,7 @@ public static class Tk2dImageConverter
             return false;
         }
 
-        if (PrefabUtility.IsPartOfPrefabInstance(go))
-        {
-            PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.UserAction);
-        }
+        Tk2dSpriteAssetUtility.UnpackIfPrefabInstance(go);
 
         EnsureRectTransform(go);
         Undo.RegisterCompleteObjectUndo(go, "Convert tk2d Button Root");
@@ -485,10 +483,7 @@ public static class Tk2dImageConverter
 
         Sprite highlightedSprite = hoverOverGO != null ? hoverOverGO.GetComponent<Image>()?.sprite : null;
 
-        if (PrefabUtility.IsPartOfPrefabInstance(go))
-        {
-            PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.UserAction);
-        }
+        Tk2dSpriteAssetUtility.UnpackIfPrefabInstance(go);
 
         EnsureRectTransform(go);
         Undo.RegisterCompleteObjectUndo(go, "Convert tk2d Toggle Root");
@@ -581,10 +576,7 @@ public static class Tk2dImageConverter
 
         GameObject go = spr.gameObject;
 
-        if (PrefabUtility.IsPartOfPrefabInstance(go))
-        {
-            PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.UserAction);
-        }
+        Tk2dSpriteAssetUtility.UnpackIfPrefabInstance(go);
 
         EnsureRectTransform(go);
 
@@ -622,7 +614,7 @@ public static class Tk2dImageConverter
 
         bool isSliced = spriteType == typeof(tk2dSlicedSprite);
 
-        Sprite unitySprite = Tk2dSpriteAssetUtility.FindOrCreateSpriteAsset(def, isSliced, slicedBorderBL, slicedBorderTR);
+        Sprite unitySprite = Tk2dSpriteAssetUtility.FindOrCreateSpriteAsset(spr, def, isSliced, slicedBorderBL, slicedBorderTR);
         if (unitySprite == null)
         {
             Debug.LogWarning($"'{go.name}': Could not find/create Sprite asset for '{def.name}'. Creating Image with null sprite.", go);
@@ -632,7 +624,7 @@ public static class Tk2dImageConverter
 
         Tk2dSpriteAssetUtility.DestroyTk2dSpriteComponents(go, spr);
 
-        var rt = go.GetComponent<RectTransform>();
+        RectTransform rt = go.GetComponent<RectTransform>();
         rt.sizeDelta = targetSize;
 
         var image = go.AddComponent<Image>();
@@ -654,23 +646,28 @@ public static class Tk2dImageConverter
         {
             image.type = Image.Type.Sliced;
             image.fillCenter = true;
+            ApplySpritePixelUnitMultiplier(image);
         }
         else if (spriteType == typeof(tk2dClippedSprite))
         {
-            image.type = Image.Type.Filled;
-            image.fillMethod = Image.FillMethod.Horizontal;
-            image.fillOrigin = (int)Image.OriginHorizontal.Left;
-            image.fillAmount = Mathf.Clamp01((clipTR.x - clipBL.x) * (clipTR.y - clipBL.y));
+            ConfigureClippedImage(image, go, clipBL, clipTR);
         }
         else if (spriteType == typeof(tk2dTiledSprite))
         {
             image.type = Image.Type.Tiled;
+            ApplySpritePixelUnitMultiplier(image);
+        }
+        else if (spriteType.Name == "tk2dRadialSprite")
+        {
+            ConfigureRadialImage(image, spr, go);
         }
         else
         {
             image.type = Image.Type.Simple;
             image.preserveAspect = true;
         }
+
+        Tk2dSpriteAssetUtility.DisableUnsupportedAnimator(go);
 
         Debug.Log($"[Tk2dConverter]   '{go.name}': Image created, starting legacy component conversion...");
         ConvertLegacyComponents(go);
@@ -683,6 +680,112 @@ public static class Tk2dImageConverter
         EditorUtility.SetDirty(go);
         return true;
     }
+
+    /// <summary>
+    /// uGUI's Image scales 9-slice borders (and tiled repeats) by
+    /// sprite.pixelsPerUnit / (canvas.referencePixelsPerUnit *
+    /// pixelsPerUnitMultiplier). tk2d works in "1 texel = 1 unit", so when the
+    /// canvas uses a different Reference Pixels Per Unit (e.g. 100) the borders
+    /// would come out 100x too small. Setting the multiplier keeps 1 texel ==
+    /// 1 canvas unit, matching what tk2d drew, without touching the texture's
+    /// import settings (which may be shared by other systems).
+    /// </summary>
+    private static void ApplySpritePixelUnitMultiplier(Image image)
+    {
+        if (image == null || image.sprite == null) return;
+
+        var canvas = image.canvas;
+        if (canvas == null || canvas.referencePixelsPerUnit <= 0f) return;
+
+        float multiplier = image.sprite.pixelsPerUnit / canvas.referencePixelsPerUnit;
+        if (multiplier <= 0f || Mathf.Approximately(multiplier, 1f)) return;
+
+        image.pixelsPerUnitMultiplier = multiplier;
+        Debug.Log($"[Tk2dConverter] '{image.name}': pixelsPerUnitMultiplier = {multiplier:0.####} " +
+                  $"(sprite PPU {image.sprite.pixelsPerUnit}, canvas ref PPU {canvas.referencePixelsPerUnit}).", image);
+    }
+
+    /// <summary>
+    /// tk2dClippedSprite exposes a normalised clip rect. uGUI's Filled image
+    /// can only animate along one axis, so pick the axis that is actually
+    /// clipped and use its extent as the fill amount (the previous code always
+    /// used Horizontal and the clipped AREA, which is wrong for a vertical
+    /// reveal and for a full-height horizontal one).
+    /// </summary>
+    private static void ConfigureClippedImage(Image image, GameObject go, Vector2 clipBL, Vector2 clipTR)
+    {
+        float width = Mathf.Clamp01(clipTR.x - clipBL.x);
+        float height = Mathf.Clamp01(clipTR.y - clipBL.y);
+
+        image.type = Image.Type.Filled;
+        image.preserveAspect = false;
+
+        if (height < 0.999f && width >= 0.999f)
+        {
+            image.fillMethod = Image.FillMethod.Vertical;
+            image.fillOrigin = (int)Image.OriginVertical.Bottom;
+            image.fillAmount = height;
+
+            if (clipBL.y > 0.001f)
+            {
+                Debug.LogWarning($"'{go.name}': tk2dClippedSprite keeps the UPPER part of the sprite " +
+                                 "(clipBottomLeft.y > 0). Image.Filled can only reveal from the bottom — " +
+                                 "verify the reveal direction.", go);
+            }
+        }
+        else
+        {
+            image.fillMethod = Image.FillMethod.Horizontal;
+            image.fillOrigin = (int)Image.OriginHorizontal.Left;
+            image.fillAmount = width;
+
+            if (clipBL.x > 0.001f)
+            {
+                Debug.LogWarning($"'{go.name}': tk2dClippedSprite keeps the RIGHT part of the sprite " +
+                                 "(clipBottomLeft.x > 0). Image.Filled can only reveal from the left — " +
+                                 "verify the reveal direction.", go);
+            }
+
+            if (height < 0.999f)
+            {
+                Debug.LogWarning($"'{go.name}': tk2dClippedSprite clips BOTH axes; only the horizontal " +
+                                 "extent was mapped to Image.Filled. Review manually if the vertical clip matters.", go);
+            }
+        }
+    }
+
+    /// <summary>
+    /// tk2dRadialSprite is a project-local component (it lives outside the
+    /// tk2d package in this project), so it can't be referenced by type here —
+    /// its VisibleAmount/RotationDirection are read through reflection and
+    /// mapped to Image.Filled/Radial360.
+    /// </summary>
+    private static void ConfigureRadialImage(Image image, tk2dBaseSprite spr, GameObject go)
+    {
+        image.type = Image.Type.Filled;
+        image.fillMethod = Image.FillMethod.Radial360;
+        image.preserveAspect = true;
+
+        float visibleAmount = 1f;
+        bool clockwise = true;
+
+        var type = spr.GetType();
+        var visibleProp = type.GetProperty("VisibleAmount");
+        if (visibleProp != null && visibleProp.PropertyType == typeof(float))
+            visibleAmount = (float)visibleProp.GetValue(spr);
+
+        var directionProp = type.GetProperty("RotationDirection");
+        if (directionProp != null)
+            clockwise = directionProp.GetValue(spr).ToString() != "CounterClockwise";
+
+        image.fillOrigin = (int)Image.Origin360.Top;
+        image.fillClockwise = clockwise;
+        image.fillAmount = Mathf.Clamp01(visibleAmount);
+
+        Debug.Log($"[Tk2dConverter] '{go.name}': tk2dRadialSprite → Image Filled/Radial360 " +
+                  $"(fillAmount {image.fillAmount:0.##}, clockwise {clockwise}). Check the fill origin/direction manually.", go);
+    }
+
 
     private static void ConvertLegacyComponents(GameObject go)
     {
@@ -715,21 +818,17 @@ public static class Tk2dImageConverter
 
         try
         {
+            // Copy every serialized TMP field (margins, auto-size bounds,
+            // spacing options, masking, ...) instead of a hand-picked subset, so
+            // the converted label matches the 3D one exactly. The values below
+            // are re-applied explicitly as a safety net: asset references and
+            // text are the fields that matter most if a property name differs
+            // between TextMeshPro and TextMeshProUGUI.
+            string json = EditorJsonUtility.ToJson(textMeshPro);
+
             string text = textMeshPro.text;
             TMP_FontAsset font = textMeshPro.font;
             Material fontMaterial = textMeshPro.fontSharedMaterial;
-            float fontSize = textMeshPro.fontSize;
-            bool autoSize = textMeshPro.autoSizeTextContainer;
-            Color color = textMeshPro.color;
-            TextAlignmentOptions alignment = textMeshPro.alignment;
-            FontStyles fontStyle = textMeshPro.fontStyle;
-            bool richText = textMeshPro.richText;
-            TextWrappingModes textWrappingMode = textMeshPro.textWrappingMode;
-            TextOverflowModes overflowMode = textMeshPro.overflowMode;
-            float lineSpacing = textMeshPro.lineSpacing;
-            float charSpacing = textMeshPro.characterSpacing;
-            float wordSpacing = textMeshPro.wordSpacing;
-            float paraSpacing = textMeshPro.paragraphSpacing;
 
             Undo.DestroyObjectImmediate(textMeshPro);
 
@@ -738,23 +837,12 @@ public static class Tk2dImageConverter
                 rt = Undo.AddComponent<RectTransform>(go);
 
             var tmpUGUI = Undo.AddComponent<TextMeshProUGUI>(go);
+            EditorJsonUtility.FromJsonOverwrite(json, tmpUGUI);
 
             tmpUGUI.text = text;
             tmpUGUI.font = font;
             tmpUGUI.fontSharedMaterial = fontMaterial;
-            tmpUGUI.fontSize = fontSize;
-            tmpUGUI.autoSizeTextContainer = autoSize;
-            tmpUGUI.color = color;
-            tmpUGUI.alignment = alignment;
-            tmpUGUI.fontStyle = fontStyle;
-            tmpUGUI.richText = richText;
             tmpUGUI.raycastTarget = true;
-            tmpUGUI.textWrappingMode = textWrappingMode;
-            tmpUGUI.overflowMode = overflowMode;
-            tmpUGUI.lineSpacing = lineSpacing;
-            tmpUGUI.characterSpacing = charSpacing;
-            tmpUGUI.wordSpacing = wordSpacing;
-            tmpUGUI.paragraphSpacing = paraSpacing;
 
             // TextMeshProUGUI renders via CanvasRenderer, not a MeshRenderer —
             // the 3D TextMeshPro's MeshRenderer/MeshFilter are dead weight now.
@@ -900,6 +988,16 @@ public static class Tk2dImageConverter
     /// scrollbar's background/handle/fill) whose own tk2dUIItem/tk2dUI*
     /// controls are now redundant once the parent has a working uGUI Slider.
     /// </summary>
+    /// <summary>
+    /// True when the component is an official tk2d UI component that can be
+    /// destroyed after conversion (project-specific tk2dUI* scripts and the
+    /// shared tk2dUIManager are preserved).
+    /// </summary>
+    private static bool IsRemovableTk2dUIComponent(Component comp)
+    {
+        return Tk2dSpriteAssetUtility.IsRemovableTk2dUIComponent(comp);
+    }
+
     private static void StripTk2dUIComponents(GameObject go)
     {
         if (go == null) return;
@@ -908,10 +1006,7 @@ public static class Tk2dImageConverter
         foreach (var comp in components)
         {
             if (comp == null) continue;
-
-            string typeName = comp.GetType().Name;
-            if (!typeName.StartsWith("tk2dUI")) continue;
-            if (Tk2dUITypeNamesToPreserve.Contains(typeName)) continue;
+            if (!IsRemovableTk2dUIComponent(comp)) continue;
 
             Undo.DestroyObjectImmediate(comp);
         }
@@ -956,13 +1051,9 @@ public static class Tk2dImageConverter
         foreach (var comp in components)
         {
             if (comp == null) continue;
-
-            string compTypeName = comp.GetType().Name;
-            if (!compTypeName.StartsWith("tk2dUI")) continue;
-
-            if (Tk2dUITypeNamesToPreserve.Contains(compTypeName))
+            if (!IsRemovableTk2dUIComponent(comp))
             {
-                Debug.LogWarning($"[Tk2dConverter]   Preserving '{compTypeName}' on '{go.name}' — it's on the exclusion list (gameplay logic, not a tk2d visual).", go);
+                Debug.Log($"[Tk2dConverter]   Preserving '{comp.GetType().Name}' on '{go.name}' — not a tk2d-owned visual component.", go);
                 continue;
             }
 
@@ -1132,6 +1223,39 @@ public static class Tk2dImageConverter
         return null;
     }
 
+    /// <summary>Starts a new conversion batch (used by the router menu).</summary>
+    internal static void BeginCanvasBatch()
+    {
+        CreatedCanvases.Clear();
+    }
+
+    /// <summary>
+    /// Applies the CanvasScaler immediately and re-centers the overlay canvas
+    /// on the current game view, so the converted layout is already correct in
+    /// the editor right after conversion (a freshly created canvas otherwise
+    /// keeps a stale screen rect until the next editor update).
+    /// </summary>
+    internal static void RefreshCreatedCanvases()
+    {
+        if (CreatedCanvases.Count == 0) return;
+
+        Canvas.ForceUpdateCanvases();
+
+        foreach (var canvas in CreatedCanvases)
+        {
+            if (canvas == null) continue;
+            if (canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            {
+                canvas.transform.position = new Vector3(
+                    Screen.width * 0.5f,
+                    Screen.height * 0.5f,
+                    0f);
+            }
+        }
+
+        CreatedCanvases.Clear();
+    }
+
     internal static void EnsureCanvasParent(GameObject go)
     {
         if (go == null) return;
@@ -1139,26 +1263,78 @@ public static class Tk2dImageConverter
 
         if (go.GetComponentInParent<Canvas>() != null) return;
 
+        // Reparenting preserves the world position, so the canvas must make
+        // 1 canvas unit equal 1 tk2d world unit. A tk2d camera keeps a fixed
+        // orthographic size, so the world height (2 * orthoSize) is always
+        // visible and everything scales with the screen height — the equivalent
+        // CanvasScaler setup is ScaleWithScreenSize matched to height, with the
+        // world height as the reference height. (ConstantPixelSize with a
+        // baked scaleFactor would freeze the HUD at the editor's resolution.)
+        var camera = ResolveSceneCamera();
+        float referenceHeight = camera != null && camera.orthographic && camera.orthographicSize > 0f
+            ? camera.orthographicSize * 2f
+            : 960f;
+
+        float aspect = Screen.height > 0 ? (float)Screen.width / Screen.height : 16f / 9f;
+
         var canvasGO = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         var canvas = canvasGO.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvasGO.transform.SetParent(go.transform.parent, false);
-        canvasGO.transform.SetSiblingIndex(go.transform.GetSiblingIndex());
-        go.transform.SetParent(canvasGO.transform, true);
+
+        var scaler = canvasGO.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(referenceHeight * aspect, referenceHeight);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 1f; // match height, exactly like the tk2d camera
+
+        // An overlay canvas is screen-space and must be a root object; nesting
+        // it under the converted hierarchy would make Unity fight over its
+        // position every frame.
+        canvasGO.transform.SetParent(null, false);
+        canvasGO.transform.SetAsLastSibling();
+        CreatedCanvases.Add(canvas);
+
+        // Reparent WITHOUT preserving the world position: an overlay canvas'
+        // world origin is the bottom-left of the screen, not the camera's world
+        // origin. Reproducing tk2d's layout means "1 canvas unit = 1 world
+        // unit, with the canvas center at the camera's position", so the local
+        // position is simply world − camera (xy).
+        Vector3 worldPosition = go.transform.position;
+        Vector3 cameraPosition = camera != null ? camera.transform.position : Vector3.zero;
+
+        go.transform.SetParent(canvasGO.transform, false);
+        go.transform.localPosition = new Vector3(worldPosition.x - cameraPosition.x,
+                                                  worldPosition.y - cameraPosition.y,
+                                                  0f);
+
         Undo.RegisterCreatedObjectUndo(canvasGO, "Create Canvas");
+
+        Debug.Log($"[Tk2dConverter] Created Canvas '{canvasGO.name}' — reference {scaler.referenceResolution.x:0}x{scaler.referenceResolution.y:0}, " +
+                  "match=height (1 canvas unit = 1 tk2d world unit at any resolution).");
+    }
+
+    /// <summary>
+    /// The camera tk2d was rendering through (prefers a scene tk2dUICamera host,
+    /// then Camera.main), used to reproduce its orthographic size in the canvas.
+    /// </summary>
+    private static Camera ResolveSceneCamera()
+    {
+        foreach (var uiCamera in Resources.FindObjectsOfTypeAll<tk2dUICamera>())
+        {
+            if (uiCamera == null || uiCamera.gameObject == null) continue;
+            if (!uiCamera.gameObject.scene.IsValid()) continue; // prefab asset, not a scene object
+
+            var host = uiCamera.GetComponent<Camera>();
+            if (host != null && host.isActiveAndEnabled)
+                return host;
+        }
+
+        return Camera.main;
     }
 
     internal static void UnpackIfPrefabInstance(GameObject go)
     {
-        if (go == null) return;
-        if (PrefabUtility.IsPartOfPrefabInstance(go))
-        {
-            var root = PrefabUtility.GetOutermostPrefabInstanceRoot(go);
-            if (root != null)
-            {
-                PrefabUtility.UnpackPrefabInstance(root, PrefabUnpackMode.Completely, InteractionMode.UserAction);
-            }
-        }
+        Tk2dSpriteAssetUtility.UnpackIfPrefabInstance(go);
     }
 
     private static void EnsureRectTransform(GameObject go)

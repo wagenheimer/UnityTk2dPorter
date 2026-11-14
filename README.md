@@ -37,8 +37,36 @@ every GameObject or rewriting every referencing script from scratch.
   confirmation-gated Apply step.
 - **Gameplay components are never silently deleted** — the converters purge orphaned
   `tk2dUI*`-prefixed components after conversion (e.g. leftover `tk2dUIToggleButtonGroup`
-  coordinators), but respect an explicit exclusion list for custom `tk2dUI*`-named classes that are
-  actually your own gameplay logic (drag-and-drop, etc.), not tk2d visuals.
+  coordinators), but only when the component is actually owned by tk2d. Custom project classes that
+  merely follow the `tk2dUI*` naming convention (drag-and-drop, clamping, etc.) are detected by
+  their script path and **preserved automatically** — no per-project exclusion list to maintain.
+- **tk2d's unit convention is preserved** — tk2d bakes its scale into the mesh (1 texel = 1 world
+  unit) instead of using the transform. Converted textures are normalized to
+  `Pixels Per Unit = 1` and the sprite's own scale is baked into the transform, so the world size
+  stays identical and gameplay code that assigns an absolute `transform.localScale` (e.g. `0.4f`)
+  keeps working.
+- **UI that behaves like the tk2d camera** — converting a world-space hierarchy to uGUI creates a
+  `Screen Space - Overlay` Canvas with `CanvasScaler` set to `Scale With Screen Size` matched to
+  height, using the tk2d camera's visible world height as the reference. 1 canvas unit therefore
+  equals 1 world unit at **any** resolution, exactly like the tk2d camera did. 9-slice and tiled
+  borders get the correct `pixelsPerUnitMultiplier`, and the canvas is rebuilt/re-centered at the end
+  of the batch so the layout is already right in the editor.
+- **World-space colliders are preserved** — converting a `tk2dSprite` to a `SpriteRenderer` keeps the
+  object's collider (custom drag/click code usually queries it); only UI conversion removes it,
+  because uGUI hit-tests the RectTransform.
+- **No silent runtime breakage from animators** — `tk2dSpriteAnimator` has no 1:1 native equivalent
+  (its clips are tk2d sprite-id timelines). Instead of leaving a broken component that throws
+  `NullReferenceException`, the tool disables it (kept on the object, reversible) and logs that the
+  clips must be recreated as Unity AnimationClips.
+- **Robust sprite-sheet writing** — uses the supported `ISpriteEditorDataProvider` API when the 2D
+  Sprite Editor package is available (Unity 2023+), falling back to the legacy
+  `TextureImporter.spritesheet` API on older editors. Sprites are pre-created per texture in one
+  reimport, so converting a 180-sprite hierarchy does not reimport the same atlas 180 times.
+- **Prefab instances convert correctly** — the enclosing prefab instance is unpacked at its
+  **root** (passing a child to `PrefabUtility.UnpackPrefabInstance` throws, which used to make the
+  whole conversion silently convert nothing).
+- **`Re-normalize converted UI`** menu — idempotent pass that fixes the 9-slice/tile border scale of
+  Images converted by an older version (or by hand).
 
 ---
 
@@ -124,7 +152,17 @@ below) before committing.
   unresolved fields default to `Image` and should be double-checked against the dry-run report.
 - No 1:1 mapping is attempted for `tk2dUIToggleButtonGroup`, `tk2dSpriteAnimator`, or custom
   drag-and-drop control classes (`tk2dUIDragItemGrid`/`tk2dUIDragItemClamp`-style components) — these
-  require a bespoke rewrite per project and are only flagged, never auto-converted.
+  require a bespoke rewrite per project. They are flagged in the log (and the animator is disabled so
+  it does not throw at runtime), never auto-converted.
+- `tk2dClippedSprite` maps to `Image.Filled` on a single axis. A clip rect that also trims the
+  opposite edge (or keeps the upper/right part) cannot be represented exactly and is reported for
+  manual review.
+- `tk2dRadialSprite` is not part of the official tk2d package; when present it is detected by type
+  name and mapped to `Image.Filled/Radial360` through reflection. Verify the fill origin/direction.
+- Converting a **prefab instance in a scene** changes that instance only. The tool unpacks it so the
+  conversion can happen; open the prefab asset in Prefab Mode to change the prefab itself.
+- The UI canvas is only created when the converted hierarchy is not already under a Canvas. If the
+  project's own Canvas uses a different scaling convention, keep using it and verify the layout.
 
 ---
 

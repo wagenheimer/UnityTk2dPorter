@@ -113,21 +113,10 @@ public class TextMeshProToUGUIConverter : TMP_EditorPanel
         float wordSpacing = tmp.wordSpacing;
         float paragraphSpacing = tmp.paragraphSpacing;
 
-        if (go.GetComponentInParent<Canvas>() == null)
-        {
-            var canvasGO = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-            var canvas = canvasGO.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvasGO.transform.SetParent(go.transform.parent, false);
-            canvasGO.transform.SetSiblingIndex(go.transform.GetSiblingIndex());
-            go.transform.SetParent(canvasGO.transform, true);
-            Undo.RegisterCreatedObjectUndo(canvasGO, "Create Canvas");
-        }
-
-        if (PrefabUtility.IsPartOfPrefabInstance(go))
-        {
-            PrefabUtility.UnpackPrefabInstance(go, PrefabUnpackMode.Completely, InteractionMode.UserAction);
-        }
+        // Reparent under a canvas that reproduces the tk2d camera scale, and
+        // unpack the enclosing prefab instance at its ROOT (passing a child to
+        // UnpackPrefabInstance throws).
+        Tk2dImageConverter.EnsureCanvasParent(go);
 
         Undo.RegisterCompleteObjectUndo(go, "Convert TMP");
 
@@ -175,6 +164,7 @@ public class TextMeshProToUGUIConverter : TMP_EditorPanel
             int group = Undo.GetCurrentGroup();
             Convert(tmp);
             Undo.CollapseUndoOperations(group);
+            Tk2dImageConverter.RefreshCreatedCanvases();
         }
     }
 

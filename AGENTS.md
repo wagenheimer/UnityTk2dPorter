@@ -24,6 +24,30 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
 
 ## Conventions & Gotchas
 
+- **tk2d's unit convention is 1 texel = 1 world unit.** tk2d bakes its scale into mesh vertices
+  (`tk2dBaseSprite.scale`, independent of `transform.localScale`), so converted textures are forced
+  to Pixels Per Unit 1 and the sprite scale is baked into the transform. Never "compensate" with a
+  100x transform scale instead: gameplay code that assigns an absolute `transform.localScale`
+  (`CoinBonus`, `LevelBooster`, etc.) would render at the wrong size.
+- **UI canvas math.** A tk2d camera keeps a fixed orthographic size, so the visible world height
+  (`2 * orthoSize`) is constant and everything scales with screen height. The equivalent uGUI setup
+  is `CanvasScaler.ScaleWithScreenSize` + `referenceResolution = (worldHeight * aspect, worldHeight)`
+  + `matchWidthOrHeight = 1`; then 1 canvas unit = 1 world unit at any resolution. The overlay canvas
+  must be a root object, and children are positioned as `world - camera.position` (NOT
+  `SetParent(..., worldPositionStays: true)` — an overlay canvas' world origin is the bottom-left of
+  the screen).
+- **Always unpack the outermost prefab instance root.** `PrefabUtility.UnpackPrefabInstance` throws
+  when given a child; that silently aborted conversion of every sprite inside a prefab instance.
+- **Sprite rects go through `Tk2dSpriteSheetUtility`.** Unity 2023+ removed support for
+  `TextureImporter.spritesheet`; the supported API (`ISpriteEditorDataProvider`) lives in the
+  optional 2D Sprite Editor package, so it is reached by reflection with a legacy fallback.
+- **Custom `tk2dUI*` classes are detected by script path**, not by a hard-coded name list: anything
+  under the same folder as `tk2dUIManager.cs` is tk2d-owned and removable; anything else is the
+  consumer project's gameplay logic and is preserved.
+- **UI border scaling:** `Image.pixelsPerUnitMultiplier = sprite.pixelsPerUnit /
+  canvas.referencePixelsPerUnit` keeps 1 texel = 1 canvas unit for Sliced/Tiled images. Forgetting it
+  makes 9-slice borders 100x too big when the canvas uses Reference PPU 100.
+
 - **Why `Editor/` (root) has NO `.asmdef`, unlike every sibling `wagenheimer/Unity*` package.**
   2D Toolkit (`Assets/TK2DROOT`) ships as raw, loose `.cs` source with no `.asmdef` of its own — it
   compiles directly into the consuming project's default assembly (`Assembly-CSharp-Editor` for
