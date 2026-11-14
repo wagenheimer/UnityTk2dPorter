@@ -16,7 +16,10 @@ UPM package. Repo root = package root, installed via git URL, no wrapper Unity p
   (tk2d → native `SpriteRenderer`), `Tk2dConversionRouter.cs` (auto-detect menu, delegates to one of
   the two above based on `GetComponentInParent<Canvas>()`), `TextMeshProToUGUIConverter.cs`
   (per-component custom Inspector button), `Tk2dScriptFieldMigrator.cs` (regex-based C# field-type
-  migrator, dry-run + apply, writes a Markdown report to `Logs/`).
+  migrator, dry-run + apply, writes a Markdown report to `Logs/`),
+  `Tk2dReferenceRemapper.cs` (GlobalObjectId reference snapshot/remap) and
+  `Tk2dAudit.cs` (read-only project inventory → Markdown + JSON under `Logs/`).
+  `MIGRATION.md` at the repo root is the agent-facing runbook.
 - `Editor/UpdateChecker/` (**has its own isolated asmdef**) — `UpdateChecker.cs` +
   `UpdateAvailableWindow.cs`, copy-pasted-and-renamed from the sibling packages
   (UnityRateControl/UnityCloudSave/UnityNativeSocial/UnityRewiredHelper), not a shared library. If

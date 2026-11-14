@@ -103,6 +103,10 @@ The package also installs [Wagenheimer Package Hub](https://github.com/wagenheim
 
 ## Usage
 
+> **Agent / automation:** see [`MIGRATION.md`](MIGRATION.md) for the full
+> audit → snapshot → convert → migrate fields → remap → verify runbook, with the
+> machine-readable outputs each step produces.
+
 ### 0. Migrating a scene end-to-end (recommended order)
 
 Converting the sprites is only half of the migration: destroying a `tk2dUIItem`/`tk2dSprite`
