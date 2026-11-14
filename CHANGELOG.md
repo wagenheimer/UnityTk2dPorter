@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.4] - 2026-11-14
+
+### Added
+- ship sprite/animation runtime, settings and automation API
+- add a project inventory and an agent migration runbook
+- remap script references across a tk2d conversion
+
+### Fixed
+- skip vendor scenes when scanning tk2d usage
+- ignore vendor demo content and count component instances
+- make the converters reusable across projects and Unity versions
+
+### Changed
+- chore: add Unity meta files for the audit and runbook
+
 ## [0.8.3] - 2026-11-12
 
 ### Changed
