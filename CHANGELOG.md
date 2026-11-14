@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.5] - 2026-11-14
+
+### Fixed
+- index sprites by tk2d name, not sprite asset name
+
 ## [0.8.4] - 2026-11-14
 
 ### Added
