@@ -1308,10 +1308,30 @@ public static class Tk2dImageConverter
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
 
             var scaler = canvasGO.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(referenceHeight * aspect, referenceHeight);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 1f; // match height, exactly like the tk2d camera
+
+            if (Tk2dPorterSettings.Instance.canvasScaleMode == Tk2dPorterSettings.CanvasScaleMode.ConstantPixelSize &&
+                camera != null && camera.orthographic && camera.orthographicSize > 0f)
+            {
+                // Legacy mode: freeze the canvas at the tk2d camera's current
+                // pixels-per-unit (kept for projects that need a constant HUD
+                // scale instead of scaling with the screen height).
+                float pixelsPerUnit = Screen.height / (2f * camera.orthographicSize);
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+                scaler.scaleFactor = pixelsPerUnit > 0f ? pixelsPerUnit : 1f;
+
+                Debug.Log($"[Tk2dConverter] Created Canvas '{canvasGO.name}' — ConstantPixelSize {scaler.scaleFactor:0.####} " +
+                          "(1 canvas unit = 1 tk2d world unit at the current game view).");
+            }
+            else
+            {
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                scaler.referenceResolution = new Vector2(referenceHeight * aspect, referenceHeight);
+                scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+                scaler.matchWidthOrHeight = 1f; // match height, exactly like the tk2d camera
+
+                Debug.Log($"[Tk2dConverter] Created Canvas '{canvasGO.name}' — reference {scaler.referenceResolution.x:0}x{scaler.referenceResolution.y:0}, " +
+                          "match=height (1 canvas unit = 1 tk2d world unit at any resolution).");
+            }
 
             // An overlay canvas is screen-space and must be a root object;
             // nesting it under the converted hierarchy would make Unity fight
@@ -1322,9 +1342,6 @@ public static class Tk2dImageConverter
 
             CreatedCanvases.Add(canvas);
             _batchCanvas = canvas;
-
-            Debug.Log($"[Tk2dConverter] Created Canvas '{canvasGO.name}' — reference {scaler.referenceResolution.x:0}x{scaler.referenceResolution.y:0}, " +
-                      "match=height (1 canvas unit = 1 tk2d world unit at any resolution).");
         }
 
         // Reparent WITHOUT preserving the world position: an overlay canvas'

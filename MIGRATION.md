@@ -37,7 +37,18 @@ across the reparenting/renaming that conversion performs).
 Do this **before** converting. Without it, the fields cannot be rebuilt
 automatically and you will have to re-drag every reference by hand.
 
-## 2. Convert the content
+## 2. Generate the runtime libraries (once, before deleting tk2d)
+
+```
+Tools → Wagenheimer → Tk2d Porter → Settings (Create/Select)        # optional: paths/policies
+Tools → Wagenheimer → Tk2d Porter → Libraries → Generate Sprite + Animation Libraries
+```
+
+This bakes every tk2d sprite name and animation clip into
+`Resources/SpriteLibrary.asset` and `Resources/AnimationLibrary.asset`, so migrated code keeps
+working with names (`SetSprite("club_A")`, `Play("rockform")`) instead of hard references.
+
+## 3. Convert the content
 
 - Prefab asset: open it in Prefab Mode, select the root, then
   **Force Convert to Sprite Renderer** (world) or **Force Convert to uGUI Image** (UI).
@@ -58,7 +69,7 @@ Checklist after conversion:
 - `tk2dCameraAnchor` removed (it fights RectTransforms).
 - `tk2dSpriteAnimator` disabled and reported (see blockers).
 
-## 3. Migrate the script field types
+## 4. Migrate the script field types
 
 ```
 Tools → Wagenheimer → Tk2d Porter → Migrate tk2d Script Fields → uGUI (Dry Run Report)
@@ -72,7 +83,7 @@ Then compile and fix the reported call sites. Typical ones:
 
 | tk2d | native |
 |---|---|
-| `sprite.SetSprite(name)` | `sprite.sprite = SpriteLibrary.Find(name)` (build a name→Sprite asset) |
+| `sprite.SetSprite(name)` | **works unchanged** via the package's `SetSprite` extension (SpriteLibrary) — or `sprite.sprite = SpriteLibrary.Find(name)` |
 | `sprite.CurrentSprite.name` | `sprite.sprite.name` |
 | `item.Enabled` | `button.interactable` |
 | `toggle.IsOn` | `toggle.isOn` / `SetIsOnWithoutNotify` |
@@ -83,7 +94,7 @@ Then compile and fix the reported call sites. Typical ones:
 | `tk2dSpriteAnimator.Play(clip)` | a native frame animator (bake the clips into an asset) |
 | `tk2dUIDragItemGrid` | a pointer-drag component (Rewired/mouse raycast) |
 
-## 4. Remap the references
+## 5. Remap the references
 
 Open the scene/prefab again and run:
 
@@ -95,7 +106,7 @@ It assigns the new component on the same GameObject to each migrated field and
 writes `Logs/tk2d-refs-remap-*.md`. Anything it cannot resolve is listed with
 the reason (`field type still tk2d`, `target not found`, `no equivalent`).
 
-## 5. Verify
+## 6. Verify
 
 1. Build a baseline **before** converting (Play Mode capture + a probe of
    positions/sizes). Compare after conversion:
@@ -106,7 +117,7 @@ the reason (`field type still tk2d`, `target not found`, `no equivalent`).
 3. Watch the Console for `NullReferenceException` — the usual cause is a field
    that was skipped by the remapper.
 
-## 6. Remove tk2d
+## 7. Remove tk2d
 
 Only after every scene/prefab is converted and tested:
 - delete `Assets/TK2DROOT` (or the tk2d folder) and the tk2d sprite collections;

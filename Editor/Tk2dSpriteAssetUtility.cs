@@ -58,11 +58,13 @@ internal static class Tk2dSpriteAssetUtility
         // converted SpriteRenderer would need a 100x localScale, and gameplay
         // code that assigns an absolute localScale (CoinBonus sets
         // Vector3.one, LevelBooster sets 0.4, etc.) would render at the wrong
-        // size.
+        // size. Can be disabled in Tk2dPorterSettings when the project has its
+        // own PPU convention.
         if (importer.textureType != TextureImporterType.Sprite)
             importer.textureType = TextureImporterType.Sprite;
 
-        if (Mathf.Abs(importer.spritePixelsPerUnit - 1f) > 0.01f)
+        if (Tk2dPorterSettings.Instance.normalizePixelsPerUnit &&
+            Mathf.Abs(importer.spritePixelsPerUnit - 1f) > 0.01f)
         {
             Debug.Log($"[Tk2dConverter] '{texPath}': Pixels Per Unit {importer.spritePixelsPerUnit:0.##} → 1 " +
                       "(tk2d's 1 texel = 1 unit convention).");
@@ -90,7 +92,8 @@ internal static class Tk2dSpriteAssetUtility
         if (importer.textureType != TextureImporterType.Sprite) return false;
 
         // tk2d's 1 texel = 1 unit convention — see FindOrCreateSpriteAsset.
-        if (Mathf.Abs(importer.spritePixelsPerUnit - 1f) > 0.01f) return false;
+        if (Tk2dPorterSettings.Instance.normalizePixelsPerUnit &&
+            Mathf.Abs(importer.spritePixelsPerUnit - 1f) > 0.01f) return false;
 
         if (isAtlasRegion)
         {
@@ -569,6 +572,14 @@ internal static class Tk2dSpriteAssetUtility
         var animator = go.GetComponent<tk2dSpriteAnimator>();
         if (animator == null) return false;
 
+        if (!Tk2dPorterSettings.Instance.disableUnsupportedAnimators)
+        {
+            Debug.LogWarning($"[Tk2dConverter] '{go.name}' has a tk2dSpriteAnimator, which has no native equivalent. " +
+                             "It was left ENABLED (Tk2dPorterSettings.disableUnsupportedAnimators = false) — " +
+                             "recreate its clips as Unity AnimationClips or a native frame animator.", go);
+            return false;
+        }
+
         Undo.RecordObject(animator, "Disable tk2dSpriteAnimator");
         animator.enabled = false;
         EditorUtility.SetDirty(animator);
@@ -608,6 +619,9 @@ internal static class Tk2dSpriteAssetUtility
         string typeName = comp.GetType().Name;
         if (!typeName.StartsWith("tk2dUI")) return false;
         if (AlwaysPreserveTypeNames.Contains(typeName)) return false;
+
+        var extra = Tk2dPorterSettings.Instance.extraPreservedTk2dUITypeNames;
+        if (extra != null && extra.Contains(typeName)) return false;
 
         string tk2dRoot = Tk2dUiCodeRoot;
         if (string.IsNullOrEmpty(tk2dRoot)) return true; // can't tell: keep historical behaviour

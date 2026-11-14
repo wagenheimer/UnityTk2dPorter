@@ -46,7 +46,7 @@ public static class Tk2dReferenceRemapper
     }
 
     [Serializable]
-    private class Snapshot
+    private class SnapshotData
     {
         public string scene;
         public string scenePath;
@@ -54,15 +54,31 @@ public static class Tk2dReferenceRemapper
         public List<RefEntry> entries = new List<RefEntry>();
     }
 
+    /// <summary>Outcome of a remap pass (also usable from automation).</summary>
+    public class RemapSummary
+    {
+        public int applied;
+        public int alreadyOk;
+        public int skipped;
+        public string reportPath;
+        public string snapshotPath;
+    }
+
     // ------------------------------------------------------------------ snapshot
 
     [MenuItem("Tools/Wagenheimer/Tk2d Porter/References/Snapshot tk2d References (Selection or Open Scene)", false, 300)]
     private static void SnapshotMenuItem()
     {
-        var scene = GetTargetScene(out var roots);
-        if (scene == null) { Debug.LogError("[Tk2dRemapper] No active scene."); return; }
+        Snapshot();
+    }
 
-        var snapshot = new Snapshot
+    /// <summary>Records the tk2d references of the selection (or open scene) and returns the snapshot path.</summary>
+    public static string Snapshot()
+    {
+        var scene = GetTargetScene(out var roots);
+        if (scene == null) { Debug.LogError("[Tk2dRemapper] No active scene."); return null; }
+
+        var snapshot = new SnapshotData
         {
             scene = scene.name,
             scenePath = scene.path,
@@ -132,6 +148,8 @@ public static class Tk2dReferenceRemapper
 
         if (skipped.Count > 0)
             Debug.Log("[Tk2dRemapper] Unassigned tk2d fields (nothing to remap):\n  " + string.Join("\n  ", skipped.Take(40)));
+
+        return path;
     }
 
     // --------------------------------------------------------------------- remap
@@ -139,23 +157,20 @@ public static class Tk2dReferenceRemapper
     [MenuItem("Tools/Wagenheimer/Tk2d Porter/References/Remap from Latest Snapshot (Open Scene)", false, 301)]
     private static void RemapLatestMenuItem()
     {
+        Remap();
+    }
+
+    /// <summary>Path of the newest snapshot for the open scene, or null.</summary>
+    public static string LatestSnapshotPath()
+    {
         var scene = GetTargetScene(out _);
-        if (scene == null) { Debug.LogError("[Tk2dRemapper] No active scene."); return; }
+        if (scene == null) return null;
 
-        string dir = LogFolder;
-        if (!Directory.Exists(dir)) { Debug.LogError("[Tk2dRemapper] No Logs folder."); return; }
+        if (!Directory.Exists(LogFolder)) return null;
 
-        var file = Directory.GetFiles(dir, $"tk2d-refs-{Sanitize(scene.name)}-*.json")
+        return Directory.GetFiles(LogFolder, $"tk2d-refs-{Sanitize(scene.name)}-*.json")
             .OrderByDescending(File.GetLastWriteTime)
             .FirstOrDefault();
-
-        if (file == null)
-        {
-            Debug.LogError($"[Tk2dRemapper] No snapshot for scene '{scene.name}'. Run the snapshot BEFORE converting.");
-            return;
-        }
-
-        Remap(file);
     }
 
     [MenuItem("Tools/Wagenheimer/Tk2d Porter/References/Remap from Snapshot File…", false, 302)]
@@ -166,20 +181,29 @@ public static class Tk2dReferenceRemapper
         Remap(file);
     }
 
-    private static void Remap(string file)
+    public static RemapSummary Remap(string file = null)
     {
-        Snapshot snapshot;
+        if (string.IsNullOrEmpty(file))
+            file = LatestSnapshotPath();
+
+        if (string.IsNullOrEmpty(file))
+        {
+            Debug.LogError("[Tk2dRemapper] No snapshot found. Run the snapshot BEFORE converting.");
+            return null;
+        }
+
+        SnapshotData snapshot;
         try
         {
-            snapshot = JsonUtility.FromJson<Snapshot>(File.ReadAllText(file));
+            snapshot = JsonUtility.FromJson<SnapshotData>(File.ReadAllText(file));
         }
         catch (Exception ex)
         {
             Debug.LogError($"[Tk2dRemapper] Could not read '{file}': {ex.Message}");
-            return;
+            return null;
         }
 
-        if (snapshot?.entries == null) return;
+        if (snapshot?.entries == null) return null;
 
         int applied = 0, alreadyOk = 0, skipped = 0;
         var problems = new List<string>();
@@ -276,6 +300,15 @@ public static class Tk2dReferenceRemapper
 
         if (skipped > 0)
             Debug.LogWarning($"[Tk2dRemapper] {skipped} reference(s) need attention:\n  " + string.Join("\n  ", problems.Take(40)));
+
+        return new RemapSummary
+        {
+            applied = applied,
+            alreadyOk = alreadyOk,
+            skipped = skipped,
+            reportPath = reportPath,
+            snapshotPath = file
+        };
     }
 
     // ------------------------------------------------------------------- helpers

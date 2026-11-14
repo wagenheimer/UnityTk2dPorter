@@ -200,11 +200,12 @@ public static class Tk2dSpriteRendererConverter
         Tk2dSpriteAssetUtility.DestroyTk2dSpriteComponents(go, spr);
 
         // World-space colliders are frequently load-bearing (custom drag/drop
-        // and click handling queries them) — keep them and let the project
-        // decide whether to switch to 2D physics.
-        Tk2dSpriteAssetUtility.RemoveLegacyComponents(go, destroyColliders: false);
+        // and click handling queries them) — keep them by default and let the
+        // project decide whether to switch to 2D physics.
+        bool destroyColliders = !Tk2dPorterSettings.Instance.preserveWorldColliders;
+        Tk2dSpriteAssetUtility.RemoveLegacyComponents(go, destroyColliders: destroyColliders);
 
-        if (go.GetComponent<BoxCollider>() != null || go.GetComponent<BoxCollider2D>() != null)
+        if (!destroyColliders && (go.GetComponent<BoxCollider>() != null || go.GetComponent<BoxCollider2D>() != null))
         {
             Debug.Log($"[Tk2dSpriteRendererConverter] '{go.name}': collider preserved as-is. " +
                       "If the project moves to 2D physics, replace it with a Collider2D manually.", go);

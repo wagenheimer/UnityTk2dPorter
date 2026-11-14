@@ -68,6 +68,28 @@ every GameObject or rewriting every referencing script from scratch.
 - **`Re-normalize converted UI`** menu — idempotent pass that fixes the 9-slice/tile border scale of
   Images converted by an older version (or by hand).
 
+## Runtime helpers (shipped with the package)
+
+Game code usually calls `tk2dSprite.SetSprite(name)`, `tk2dSpriteAnimator.Play(clip)` and reads
+`VisibleAmount`/`ClipRect`. The package ships the runtime pieces those calls need:
+
+| Type | Replaces |
+|---|---|
+| `Wagenheimer.Tk2dPorter.SpriteLibrary` | name → Sprite lookup behind `SetSprite(name)` |
+| `Wagenheimer.Tk2dPorter.AnimationLibrary` + `SpriteClipAnimator` | `tk2dSpriteAnimation` + `tk2dSpriteAnimator` |
+| `SpriteLibraryExtensions` | `renderer.SetSprite(name)`, `GetSpriteName()`, `SetVisibleAmount()`, `SetClipRect()` |
+
+Generate the two assets with **Tools → Wagenheimer → Tk2d Porter → Libraries → Generate Sprite +
+Animation Libraries** (paths and policies live in **Settings**). Run it before deleting tk2d.
+Because of the extension methods, `frontSprite.SetSprite("club_A")` keeps compiling after the field
+type changes from `tk2dSprite` to `SpriteRenderer`/`Image`.
+
+## Automation API
+
+`Tk2dMigration` exposes structured entry points so a script or agent can drive the migration without
+menu labels or editor selection: `Audit()`, `GenerateLibraries()`, `SnapshotReferences()`,
+`ConvertSelection(mode)`, `ConvertPrefab(path, mode)` and `RemapReferences(snapshotPath)`.
+
 ---
 
 ## Requirements
