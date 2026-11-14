@@ -88,6 +88,7 @@ public static class Tk2dAudit
         {
             string path = AssetDatabase.GUIDToAssetPath(guid);
             if (!path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)) continue;
+            if (IgnorePathPrefixes.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase))) continue;
 
             string text;
             try { text = File.ReadAllText(path); }
