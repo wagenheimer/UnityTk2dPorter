@@ -39,6 +39,12 @@ public static class Tk2dAudit
         "tk2dUIScrollbar",
     };
 
+    // Demo/vendor content that is not part of the game's migration surface.
+    private static readonly string[] IgnorePathPrefixes =
+    {
+        "Assets/TK2DROOT/",
+    };
+
     [MenuItem("Tools/Wagenheimer/Tk2d Porter/Audit Project (Report)", false, 400)]
     private static void AuditMenu()
     {
@@ -54,6 +60,7 @@ public static class Tk2dAudit
         {
             string path = AssetDatabase.GUIDToAssetPath(guid);
             if (!path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)) continue;
+            if (IgnorePathPrefixes.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase))) continue;
 
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             if (prefab == null) continue;
@@ -64,7 +71,13 @@ public static class Tk2dAudit
                 .ToDictionary(g => g.Key, g => g.Count());
 
             if (counts.Count == 0) continue;
-            rows.Add(new Row { Kind = "prefab", Path = path, Counts = counts });
+
+            // Collections/animations are tk2d SOURCE DATA (read by the library
+            // generator), not content that gets sprite-converted.
+            bool isData = prefab.GetComponent<tk2dSpriteCollectionData>() != null ||
+                          prefab.GetComponent<tk2dSpriteAnimation>() != null;
+
+            rows.Add(new Row { Kind = isData ? "data" : "prefab", Path = path, Counts = counts });
         }
 
         // ---- scenes (text scan: never opens/changes a scene) ----
@@ -83,7 +96,10 @@ public static class Tk2dAudit
             var counts = new Dictionary<string, int>();
             foreach (var kv in guidMap)
             {
-                int n = Regex.Matches(text, "guid: " + kv.Key).Count;
+                // Count component INSTANCES (m_Script), not every reference to
+                // the script GUID (which would also count e.g. field references
+                // and prefab overrides).
+                int n = Regex.Matches(text, "m_Script: \\{fileID: 11500000, guid: " + kv.Key).Count;
                 if (n > 0) counts[kv.Value] = n;
             }
 
@@ -105,7 +121,7 @@ public static class Tk2dAudit
         {
             int total = row.Counts.Values.Sum();
             var blockers = row.Counts.Where(kv => UnsupportedTypes.Contains(kv.Key))
-                .Select(kv => kv.Key + "×" + kv.Value);
+                .Select(kv => kv.Key + " x" + kv.Value);
             sb.AppendLine($"| {row.Path} | {row.Kind} | {total} | {string.Join(", ", blockers)} |");
         }
         sb.AppendLine();
