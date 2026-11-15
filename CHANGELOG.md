@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.6] - 2026-11-15
+
+### Fixed
+- keep UI pixels-per-unit and snapshot TextMeshPro fields
+
 ## [0.8.5] - 2026-11-14
 
 ### Fixed
