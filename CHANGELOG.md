@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.9] - 2026-11-15
+
+### Fixed
+- compile the editor tools into their own assembly
+
 ## [0.8.8] - 2026-11-15
 
 ### Fixed
