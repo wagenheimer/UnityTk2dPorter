@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.8] - 2026-11-15
+
+### Fixed
+- keep icon buttons from having their sprite replaced by the button frame
+
 ## [0.8.7] - 2026-11-15
 
 ### Fixed
