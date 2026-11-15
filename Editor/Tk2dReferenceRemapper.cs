@@ -112,7 +112,12 @@ public static class Tk2dReferenceRemapper
                         property.name,
                         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                     if (field == null) continue;
-                    if (!field.FieldType.Name.StartsWith("tk2d")) continue;
+                    // tk2d components plus TextMeshPro 3D (the UI converter
+                    // replaces it with TextMeshProUGUI, which also breaks the
+                    // serialized reference).
+                    bool isTk2dType = field.FieldType.Name.StartsWith("tk2d");
+                    bool isTmp3D = field.FieldType.Name == "TextMeshPro";
+                    if (!isTk2dType && !isTmp3D) continue;
 
                     var target = property.objectReferenceValue as Component;
                     if (target == null)
@@ -253,7 +258,7 @@ public static class Tk2dReferenceRemapper
                 continue;
             }
 
-            if (field.FieldType.Name.StartsWith("tk2d"))
+            if (field.FieldType.Name.StartsWith("tk2d") || field.FieldType.Name == "TextMeshPro")
             {
                 skipped++;
                 problems.Add($"field type is still '{field.FieldType.Name}': {entry.ownerPath}.{entry.field} — " +
@@ -347,6 +352,9 @@ public static class Tk2dReferenceRemapper
             case "tk2dUIScrollbar":
                 return new[] { "Slider" };
         }
+
+        if (tk2dType == "TextMeshPro")
+            return new[] { "TextMeshProUGUI" };
 
         if (tk2dType.StartsWith("tk2dSprite") || tk2dType == "tk2dBaseSprite")
             return new[] { "Image", "SpriteRenderer" };

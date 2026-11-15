@@ -53,12 +53,19 @@ public static class Tk2dMigration
 
         var summary = new ConversionSummary { roots = selected.Select(g => g.name).ToArray() };
 
-        var prewarm = new List<tk2dBaseSprite>();
+        var uiPrewarm = new List<tk2dBaseSprite>();
+        var worldPrewarm = new List<tk2dBaseSprite>();
+
         foreach (var go in selected)
-            prewarm.AddRange(go.GetComponentsInChildren<tk2dBaseSprite>(true));
+        {
+            bool isUI = mode == Mode.UI || (mode == Mode.Auto && go.GetComponentInParent<Canvas>() != null);
+            var target = isUI ? uiPrewarm : worldPrewarm;
+            target.AddRange(go.GetComponentsInChildren<tk2dBaseSprite>(true));
+        }
 
         Tk2dImageConverter.BeginCanvasBatch();
-        Tk2dSpriteAssetUtility.Prewarm(prewarm);
+        Tk2dSpriteAssetUtility.Prewarm(uiPrewarm, 0f, 100f);
+        Tk2dSpriteAssetUtility.Prewarm(worldPrewarm, 1f, 1f);
 
         var convertedObjects = new List<GameObject>();
         var log = new StringBuilder();

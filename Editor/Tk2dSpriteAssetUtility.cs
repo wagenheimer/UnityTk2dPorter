@@ -19,7 +19,8 @@ internal static class Tk2dSpriteAssetUtility
     /// searching the whole project for a file with the same name, which could
     /// silently import an unrelated texture as a Sprite and corrupt it.
     /// </summary>
-    internal static Sprite FindOrCreateSpriteAsset(tk2dBaseSprite spr, tk2dSpriteDefinition def, bool isSliced, Vector2 borderBL, Vector2 borderTR)
+    internal static Sprite FindOrCreateSpriteAsset(tk2dBaseSprite spr, tk2dSpriteDefinition def, bool isSliced, Vector2 borderBL, Vector2 borderTR,
+        float exactPixelsPerUnit, float newImportPixelsPerUnit)
     {
         if (def == null) return null;
 
@@ -44,7 +45,7 @@ internal static class Tk2dSpriteAssetUtility
         // Already converted and up to date? Return it without touching any
         // import setting — reprocessing an already-correct texture on every
         // run is slow and risks corrupting textures shared with other tools.
-        if (IsSpriteUpToDate(texPath, def, isAtlasRegion, isSliced, border, importer))
+        if (IsSpriteUpToDate(texPath, def, isAtlasRegion, isSliced, border, importer, exactPixelsPerUnit))
         {
             var existing = LoadSpriteAtPath(texPath, def);
             if (existing != null) return existing;
@@ -52,23 +53,24 @@ internal static class Tk2dSpriteAssetUtility
 
         bool needsReimport = false;
 
-        // tk2d works in "1 texel = 1 world unit": it bakes its own scale into
-        // the mesh instead of using the transform. Native sprites derive their
-        // size from pixelsPerUnit, so the texture must use PPU 1 — otherwise a
-        // converted SpriteRenderer would need a 100x localScale, and gameplay
-        // code that assigns an absolute localScale (CoinBonus sets
-        // Vector3.one, LevelBooster sets 0.4, etc.) would render at the wrong
-        // size. Can be disabled in Tk2dPorterSettings when the project has its
-        // own PPU convention.
-        if (importer.textureType != TextureImporterType.Sprite)
+        // Pixels Per Unit depends on the destination:
+        //  - world (SpriteRenderer): tk2d's 1 texel = 1 unit, so the texture is
+        //    forced to PPU 1. Otherwise the SpriteRenderer would need a 100x
+        //    localScale and gameplay code that assigns an absolute localScale
+        //    would render at the wrong size.
+        //  - UI (Image): the project convention keeps UI sprites at PPU 100
+        //    (exactPixelsPerUnit = 0 leaves an existing sprite untouched; a
+        //    brand-new import gets newImportPixelsPerUnit).
+        bool wasSprite = importer.textureType == TextureImporterType.Sprite;
+        if (!wasSprite)
             importer.textureType = TextureImporterType.Sprite;
 
-        if (Tk2dPorterSettings.Instance.normalizePixelsPerUnit &&
-            Mathf.Abs(importer.spritePixelsPerUnit - 1f) > 0.01f)
+        float desiredPpu = wasSprite ? exactPixelsPerUnit : newImportPixelsPerUnit;
+        if (Tk2dPorterSettings.Instance.normalizePixelsPerUnit && desiredPpu > 0f &&
+            Mathf.Abs(importer.spritePixelsPerUnit - desiredPpu) > 0.01f)
         {
-            Debug.Log($"[Tk2dConverter] '{texPath}': Pixels Per Unit {importer.spritePixelsPerUnit:0.##} → 1 " +
-                      "(tk2d's 1 texel = 1 unit convention).");
-            importer.spritePixelsPerUnit = 1f;
+            Debug.Log($"[Tk2dConverter] '{texPath}': Pixels Per Unit {importer.spritePixelsPerUnit:0.##} → {desiredPpu:0.##}.");
+            importer.spritePixelsPerUnit = desiredPpu;
             needsReimport = true;
         }
 
@@ -87,13 +89,15 @@ internal static class Tk2dSpriteAssetUtility
     /// True when the texture already carries a sprite with this definition's
     /// name, the right import mode, and (for sliced sprites) the right border.
     /// </summary>
-    private static bool IsSpriteUpToDate(string texPath, tk2dSpriteDefinition def, bool isAtlasRegion, bool isSliced, Vector4 border, TextureImporter importer)
+    private static bool IsSpriteUpToDate(string texPath, tk2dSpriteDefinition def, bool isAtlasRegion, bool isSliced, Vector4 border, TextureImporter importer,
+        float exactPixelsPerUnit)
     {
         if (importer.textureType != TextureImporterType.Sprite) return false;
 
-        // tk2d's 1 texel = 1 unit convention — see FindOrCreateSpriteAsset.
-        if (Tk2dPorterSettings.Instance.normalizePixelsPerUnit &&
-            Mathf.Abs(importer.spritePixelsPerUnit - 1f) > 0.01f) return false;
+        // World conversion targets PPU 1; UI conversion leaves the PPU as-is
+        // (see FindOrCreateSpriteAsset).
+        if (Tk2dPorterSettings.Instance.normalizePixelsPerUnit && exactPixelsPerUnit > 0f &&
+            Mathf.Abs(importer.spritePixelsPerUnit - exactPixelsPerUnit) > 0.01f) return false;
 
         if (isAtlasRegion)
         {
@@ -121,7 +125,7 @@ internal static class Tk2dSpriteAssetUtility
     /// Best-effort: any failure is logged and the regular per-sprite path
     /// still works afterwards.
     /// </summary>
-    internal static void Prewarm(IEnumerable<tk2dBaseSprite> sprites)
+    internal static void Prewarm(IEnumerable<tk2dBaseSprite> sprites, float exactPixelsPerUnit, float newImportPixelsPerUnit)
     {
         if (sprites == null) return;
 
@@ -174,12 +178,16 @@ internal static class Tk2dSpriteAssetUtility
                 var importer = AssetImporter.GetAtPath(texPath) as TextureImporter;
                 if (importer == null) continue;
 
-                if (importer.textureType != TextureImporterType.Sprite)
+                bool wasSprite = importer.textureType == TextureImporterType.Sprite;
+                if (!wasSprite)
                     importer.textureType = TextureImporterType.Sprite;
 
-                // The texture is becoming a tk2d atlas: 1 texel = 1 world unit.
-                if (Mathf.Abs(importer.spritePixelsPerUnit - 1f) > 0.01f)
-                    importer.spritePixelsPerUnit = 1;
+                // World atlases use PPU 1; UI atlases keep the project's PPU
+                // convention (a new import gets newImportPixelsPerUnit).
+                float desiredPpu = wasSprite ? exactPixelsPerUnit : newImportPixelsPerUnit;
+                if (Tk2dPorterSettings.Instance.normalizePixelsPerUnit && desiredPpu > 0f &&
+                    Mathf.Abs(importer.spritePixelsPerUnit - desiredPpu) > 0.01f)
+                    importer.spritePixelsPerUnit = desiredPpu;
 
                 if (importer.spriteImportMode != SpriteImportMode.Multiple)
                     importer.spriteImportMode = SpriteImportMode.Multiple;

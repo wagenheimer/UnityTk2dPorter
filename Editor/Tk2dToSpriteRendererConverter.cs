@@ -30,7 +30,7 @@ public static class Tk2dSpriteRendererConverter
         var prewarmSprites = new List<tk2dBaseSprite>();
         foreach (var go in selected)
             prewarmSprites.AddRange(go.GetComponentsInChildren<tk2dBaseSprite>(true));
-        Tk2dSpriteAssetUtility.Prewarm(prewarmSprites);
+        Tk2dSpriteAssetUtility.Prewarm(prewarmSprites, 1f, 1f);
 
         foreach (var go in selected)
         {
@@ -93,7 +93,7 @@ public static class Tk2dSpriteRendererConverter
             var log = new StringBuilder();
             int count = 0;
 
-            Tk2dSpriteAssetUtility.Prewarm(spr.gameObject.GetComponentsInChildren<tk2dBaseSprite>(true));
+            Tk2dSpriteAssetUtility.Prewarm(spr.gameObject.GetComponentsInChildren<tk2dBaseSprite>(true), 1f, 1f);
             ConvertRecursive(spr.gameObject, converted, log, ref count);
 
             Undo.CollapseUndoOperations(group);
@@ -184,7 +184,7 @@ public static class Tk2dSpriteRendererConverter
 
         bool isSliced = spriteType == typeof(tk2dSlicedSprite);
 
-        Sprite unitySprite = Tk2dSpriteAssetUtility.FindOrCreateSpriteAsset(spr, def, isSliced, slicedBorderBL, slicedBorderTR);
+        Sprite unitySprite = Tk2dSpriteAssetUtility.FindOrCreateSpriteAsset(spr, def, isSliced, slicedBorderBL, slicedBorderTR, 1f, 1f);
         if (unitySprite == null)
         {
             Debug.LogWarning($"'{go.name}': Could not find/create Sprite asset for '{def.name}'. Creating SpriteRenderer with null sprite.", go);

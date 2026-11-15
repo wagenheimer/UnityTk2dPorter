@@ -54,7 +54,7 @@ public static class Tk2dImageConverter
         var prewarmSprites = new List<tk2dBaseSprite>();
         foreach (var go in selected)
             prewarmSprites.AddRange(go.GetComponentsInChildren<tk2dBaseSprite>(true));
-        Tk2dSpriteAssetUtility.Prewarm(prewarmSprites);
+        Tk2dSpriteAssetUtility.Prewarm(prewarmSprites, 0f, 100f);
 
         foreach (var go in selected)
         {
@@ -629,7 +629,7 @@ public static class Tk2dImageConverter
 
         bool isSliced = spriteType == typeof(tk2dSlicedSprite);
 
-        Sprite unitySprite = Tk2dSpriteAssetUtility.FindOrCreateSpriteAsset(spr, def, isSliced, slicedBorderBL, slicedBorderTR);
+        Sprite unitySprite = Tk2dSpriteAssetUtility.FindOrCreateSpriteAsset(spr, def, isSliced, slicedBorderBL, slicedBorderTR, 0f, 100f);
         if (unitySprite == null)
         {
             Debug.LogWarning($"'{go.name}': Could not find/create Sprite asset for '{def.name}'. Creating Image with null sprite.", go);
