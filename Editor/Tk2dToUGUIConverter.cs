@@ -1162,42 +1162,56 @@ public static class Tk2dImageConverter
 
         button.transition = Selectable.Transition.Animation;
 
-        var animator = go.GetComponent<Animator>();
-        if (animator == null)
-        {
-            animator = Undo.AddComponent<Animator>(go);
-        }
-
         var buttonController = FindButtonAnimatorController();
 
-        if (buttonController != null)
+        // A button animation controller usually swaps the target Image's sprite
+        // for the button frame (Normal/Highlighted/Pressed). Applying it to an
+        // icon (booster, undo, menu, card...) would replace the icon with the
+        // button art, so those objects only get the click wiring.
+        if (buttonController != null && image != null && image.sprite != null &&
+            !AnimationControllerAnimatesSprite(buttonController, image.sprite))
         {
-            animator.runtimeAnimatorController = buttonController;
-            Debug.Log($"✓ [{go.name}] Button configured with '{buttonController.name}' AnimatorController", go);
+            Debug.Log($"[Tk2dConverter]   '{go.name}': '{buttonController.name}' animates the button-frame sprite, " +
+                      $"not '{image.sprite.name}' — keeping the icon, using no visual transition.", go);
+            button.transition = Selectable.Transition.None;
         }
         else
         {
-            // Log only — an EditorUtility.DisplayDialog here is modal and
-            // interrupts/reenters the batch conversion loop, causing it to
-            // appear to "stop halfway" when several buttons are selected.
-            Debug.LogWarning($"✗ [{go.name}] No 'Button' AnimatorController found in the project. " +
-                           "Create one via Assets > Create > Animator Controller and assign it to the Animator manually.", go);
-
-            if (!_missingButtonControllerWarned)
+            var animator = go.GetComponent<Animator>();
+            if (animator == null)
             {
-                _missingButtonControllerWarned = true;
-                EditorApplication.delayCall += () =>
+                animator = Undo.AddComponent<Animator>(go);
+            }
+
+            if (buttonController != null)
+            {
+                animator.runtimeAnimatorController = buttonController;
+                Debug.Log($"✓ [{go.name}] Button configured with '{buttonController.name}' AnimatorController", go);
+            }
+            else
+            {
+                // Log only — an EditorUtility.DisplayDialog here is modal and
+                // interrupts/reenters the batch conversion loop, causing it to
+                // appear to "stop halfway" when several buttons are selected.
+                Debug.LogWarning($"✗ [{go.name}] No 'Button' AnimatorController found in the project. " +
+                               "Create one via Assets > Create > Animator Controller and assign it to the Animator manually.", go);
+
+                if (!_missingButtonControllerWarned)
                 {
-                    EditorUtility.DisplayDialog(
-                        "AnimatorController not found",
-                        "No AnimatorController named 'Button' was found in the project.\n\n" +
-                        "One or more converted buttons ended up without an animation assigned " +
-                        "(see the Console warnings for the full list).\n\n" +
-                        "Create an Animator Controller (Assets > Create > Animator Controller), " +
-                        "name it with 'Button' in the name, define the Normal/Highlighted/" +
-                        "Pressed/Disabled states, and assign it manually to each button's Animator component.",
-                        "OK");
-                };
+                    _missingButtonControllerWarned = true;
+                    EditorApplication.delayCall += () =>
+                    {
+                        EditorUtility.DisplayDialog(
+                            "AnimatorController not found",
+                            "No AnimatorController named 'Button' was found in the project.\n\n" +
+                            "One or more converted buttons ended up without an animation assigned " +
+                            "(see the Console warnings for the full list).\n\n" +
+                            "Create an Animator Controller (Assets > Create > Animator Controller), " +
+                            "name it with 'Button' in the name, define the Normal/Highlighted/" +
+                            "Pressed/Disabled states, and assign it manually to each button's Animator component.",
+                            "OK");
+                    };
+                }
             }
         }
 
@@ -1236,6 +1250,33 @@ public static class Tk2dImageConverter
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// True when any clip in the controller animates <c>Image.m_Sprite</c> to
+    /// the given sprite — i.e. the controller is meant for a button whose image
+    /// is the button frame itself.
+    /// </summary>
+    private static bool AnimationControllerAnimatesSprite(RuntimeAnimatorController controller, Sprite sprite)
+    {
+        if (controller == null || sprite == null) return false;
+
+        foreach (var clip in controller.animationClips)
+        {
+            if (clip == null) continue;
+
+            foreach (var binding in AnimationUtility.GetObjectReferenceCurveBindings(clip))
+            {
+                if (binding.propertyName != "m_Sprite") continue;
+
+                var keys = AnimationUtility.GetObjectReferenceCurve(clip, binding);
+                foreach (var key in keys)
+                    if (key.value == sprite)
+                        return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Starts a new conversion batch (used by the router menu).</summary>
