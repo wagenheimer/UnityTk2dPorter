@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.10] - 2026-11-15
+
+### Fixed
+- add the missing meta for the tools asmdef
+
 ## [0.8.9] - 2026-11-15
 
 ### Fixed
