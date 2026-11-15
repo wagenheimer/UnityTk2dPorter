@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.11] - 2026-11-15
+
+### Changed
+- revert(package): remove the tools asmdef
+
 ## [0.8.10] - 2026-11-15
 
 ### Fixed
