@@ -1,0 +1,16 @@
+{
+  "name": "Wagenheimer.Tk2dPorter.Tools",
+  "rootNamespace": "",
+  "references": [
+    "Wagenheimer.Tk2dPorter"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
