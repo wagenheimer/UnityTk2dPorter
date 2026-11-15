@@ -117,7 +117,12 @@ public static class Tk2dReferenceRemapper
                     // serialized reference).
                     bool isTk2dType = field.FieldType.Name.StartsWith("tk2d");
                     bool isTmp3D = field.FieldType.Name == "TextMeshPro";
-                    if (!isTk2dType && !isTmp3D) continue;
+                    // tk2d UI items sit on an object with a collider, and lots of
+                    // scripts keep that Collider in a field (hit testing / drag).
+                    // When the object is a UI control the field usually becomes a
+                    // Button/Image, so those fields are snapshotted too.
+                    bool isCollider = field.FieldType == typeof(Collider) || field.FieldType == typeof(Collider2D);
+                    if (!isTk2dType && !isTmp3D && !(isCollider && IsTk2dUIControl(behaviour.gameObject))) continue;
 
                     var target = property.objectReferenceValue as Component;
                     if (target == null)
@@ -212,12 +217,13 @@ public static class Tk2dReferenceRemapper
 
         int applied = 0, alreadyOk = 0, skipped = 0;
         var problems = new List<string>();
+        var body = new StringBuilder();
         var report = new StringBuilder();
         report.AppendLine("# Tk2d Reference Remap Report");
         report.AppendLine();
         report.AppendLine($"Snapshot: {file}");
         report.AppendLine($"Scene: {snapshot.scene} ({snapshot.scenePath})");
-        report.AppendLine($"Applied: {applied} | Already OK: {alreadyOk} | Skipped: {skipped}");
+        int insertAt = report.Length;
         report.AppendLine();
 
         Undo.SetCurrentGroupName("Remap tk2d references");
@@ -289,13 +295,15 @@ public static class Tk2dReferenceRemapper
             EditorUtility.SetDirty(owner);
             applied++;
 
-            report.AppendLine($"- {entry.ownerPath}.{entry.field}: {entry.targetType} → {replacement.GetType().Name} on {entry.targetPath}");
-        }
+            body.AppendLine($"- {entry.ownerPath}.{entry.field}: {entry.targetType} → {replacement.GetType().Name} on {entry.targetPath}");        }
 
         Undo.CollapseUndoOperations(group);
 
         foreach (var problem in problems)
             report.AppendLine($"- SKIPPED: {problem}");
+
+        report.Insert(insertAt, $"Applied: {applied} | Already OK: {alreadyOk} | Skipped: {skipped}{Environment.NewLine}{Environment.NewLine}");
+        report.Append(body);
 
         string reportPath = Path.Combine(LogFolder, $"tk2d-refs-remap-{DateTime.Now:yyyyMMdd_HHmmss}.md");
         Directory.CreateDirectory(LogFolder);
@@ -335,6 +343,20 @@ public static class Tk2dReferenceRemapper
         return null;
     }
 
+    /// <summary>True when the object carries any tk2d UI control (tk2dUI*).</summary>
+    private static bool IsTk2dUIControl(GameObject target)
+    {
+        if (target == null) return false;
+
+        foreach (var behaviour in target.GetComponents<MonoBehaviour>())
+        {
+            if (behaviour == null) continue;
+            if (behaviour.GetType().Name.StartsWith("tk2dUI")) return true;
+        }
+
+        return false;
+    }
+
     private static IEnumerable<string> CandidatesFor(string tk2dType)
     {
         switch (tk2dType)
@@ -345,12 +367,36 @@ public static class Tk2dReferenceRemapper
             case "tk2dUIBaseItemControl":
                 return new[] { "Button", "Toggle", "Slider" };
 
+            // Fields that held the tk2d UI item's collider now point at the
+            // interactive component (or the visual, for drag/hit-test code).
+            case "Collider":
+            case "Collider2D":
+            case "BoxCollider":
+            case "BoxCollider2D":
+                return new[] { "Button", "Toggle", "Image", "SpriteRenderer" };
+
             case "tk2dUIToggleButton":
             case "tk2dUIToggleControl":
                 return new[] { "Toggle", "Button" };
 
             case "tk2dUIScrollbar":
                 return new[] { "Slider" };
+
+            // Every tk2d sprite flavour becomes an Image in a canvas or a
+            // SpriteRenderer in the world. They do not share the "tk2dSprite"
+            // prefix (tk2dSlicedSprite, tk2dClippedSprite, ...), so each has to
+            // be listed.
+            case "tk2dSlicedSprite":
+            case "tk2dTiledSprite":
+            case "tk2dClippedSprite":
+            case "tk2dRadialSprite":
+                return new[] { "Image", "SpriteRenderer" };
+
+            case "tk2dCamera":
+                return new[] { "Camera" };
+
+            case "tk2dSpriteAnimator":
+                return new[] { "SpriteRenderer", "Image" };
         }
 
         if (tk2dType == "TextMeshPro")
